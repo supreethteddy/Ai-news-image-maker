@@ -1,13 +1,17 @@
 {
-  "name": "base44-app",
+  "name": "newsplay-ai-storyboard",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "AI-powered visual storyboard creator that transforms text articles into stunning visual stories",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:backend\"",
+    "install:all": "npm install && cd backend && npm install"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.2",

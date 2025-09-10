@@ -11,7 +11,7 @@ export const runwareImageGeneration = async (params) => {
       ...params.options
     };
     
-    const response = await apiClient.generateImage(params.prompt, options);
+    const response = await apiClient.generateImage(params.prompt, options, params.characterReferenceImages || []);
     const url = response?.data?.url || response?.data?.data?.[0]?.url || response?.url || null;
     return {
       data: {

@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import apiClient from '@/api/client.js';
-import { User } from '@/api/entities.js';
 
 const AuthContext = createContext();
 
@@ -14,85 +12,154 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Check for existing token on app load
   useEffect(() => {
-    checkAuthStatus();
+    const savedToken = localStorage.getItem('authToken');
+    const savedUser = localStorage.getItem('user');
+    
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
   }, []);
 
-  const checkAuthStatus = async () => {
+  const login = async (email, password) => {
     try {
-      const token = localStorage.getItem('newsplay_token');
-      if (token) {
-        apiClient.setToken(token);
-        const userData = await User.getCurrentUser();
-        if (userData) {
-          setUser(userData);
-          setIsAuthenticated(true);
-        } else {
-          // Token is invalid
-          apiClient.logout();
-        }
+      console.log('Attempting login with:', email);
+      const response = await fetch('http://localhost:3001/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      console.log('Login response:', data);
+
+      if (data.success) {
+        const { user: userData, token: authToken } = data.data;
+        setUser(userData);
+        setToken(authToken);
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('user', JSON.stringify(userData));
+        console.log('Login successful, user set:', userData);
+        return { success: true };
+      } else {
+        console.log('Login failed:', data.message);
+        return { success: false, message: data.message };
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
-      apiClient.logout();
-    } finally {
-      setLoading(false);
+      console.error('Login error:', error);
+      return { success: false, message: 'Login failed. Please try again.' };
     }
   };
 
-  const login = async (credentials) => {
+  const register = async (name, email, password) => {
     try {
-      const response = await User.login(credentials);
-      setUser(response.user);
-      setIsAuthenticated(true);
-      return { success: true, user: response.user };
-    } catch (error) {
-      console.error('Login failed:', error);
-      return { success: false, error: error.message };
-    }
-  };
+      console.log('Attempting registration with:', email);
+      const response = await fetch('http://localhost:3001/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-  const register = async (userData) => {
-    try {
-      const response = await User.register(userData);
-      setUser(response.user);
-      setIsAuthenticated(true);
-      return { success: true, user: response.user };
+      const data = await response.json();
+      console.log('Registration response:', data);
+
+      if (data.success) {
+        const { user: userData, token: authToken } = data.data;
+        setUser(userData);
+        setToken(authToken);
+        localStorage.setItem('authToken', authToken);
+        localStorage.setItem('user', JSON.stringify(userData));
+        console.log('Registration successful, user set:', userData);
+        return { success: true };
+      } else {
+        console.log('Registration failed:', data.message);
+        return { success: false, message: data.message };
+      }
     } catch (error) {
-      console.error('Registration failed:', error);
-      return { success: false, error: error.message };
+      console.error('Registration error:', error);
+      return { success: false, message: 'Registration failed. Please try again.' };
     }
   };
 
   const logout = () => {
-    User.logout();
     setUser(null);
-    setIsAuthenticated(false);
+    setToken(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
   };
 
   const updateProfile = async (profileData) => {
     try {
-      const updatedUser = await User.updateProfile(profileData);
-      setUser(updatedUser);
-      return { success: true, user: updatedUser };
+      const response = await fetch('http://localhost:3001/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUser(data.data);
+        localStorage.setItem('user', JSON.stringify(data.data));
+        return { success: true };
+      } else {
+        return { success: false, message: data.message };
+      }
     } catch (error) {
-      console.error('Profile update failed:', error);
-      return { success: false, error: error.message };
+      console.error('Profile update error:', error);
+      return { success: false, message: 'Profile update failed. Please try again.' };
     }
   };
 
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/auth/change-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        return { success: true };
+      } else {
+        return { success: false, message: data.message };
+      }
+    } catch (error) {
+      console.error('Password change error:', error);
+      return { success: false, message: 'Password change failed. Please try again.' };
+    }
+  };
+
+  const isAuthenticated = !!user && !!token;
+
   const value = {
     user,
-    isAuthenticated,
+    token,
     loading,
+    isAuthenticated,
     login,
     register,
     logout,
     updateProfile,
-    checkAuthStatus
+    changePassword,
   };
 
   return (

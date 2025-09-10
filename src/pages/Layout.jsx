@@ -44,7 +44,6 @@ const navigationItems = [
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [showSplash, setShowSplash] = useState(true);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const { user, isAuthenticated, logout, loading } = useAuth();
 
   useEffect(() => {
@@ -224,15 +223,16 @@ export default function Layout({ children, currentPageName }) {
                     <p className="text-xs text-slate-500 truncate">Transform stories</p>
                   </div>
                 </div>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setShowAuthModal(true)}
-                  className="w-full text-xs bg-purple-600 hover:bg-purple-700"
-                >
-                  <User className="w-3 h-3 mr-2" />
-                  Login / Register
-                </Button>
+                <AuthModal>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full text-xs bg-purple-600 hover:bg-purple-700"
+                  >
+                    <User className="w-3 h-3 mr-2" />
+                    Login / Register
+                  </Button>
+                </AuthModal>
               </div>
             )}
           </SidebarFooter>
@@ -252,9 +252,6 @@ export default function Layout({ children, currentPageName }) {
         </main>
       </div>
       
-      {showAuthModal && (
-        <AuthModal onClose={() => setShowAuthModal(false)} />
-      )}
     </SidebarProvider>);
 
 }

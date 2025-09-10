@@ -6,10 +6,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Camera, Upload, Image as ImageIcon, Loader2, Plus } from 'lucide-react';
+import { Camera, Upload, Image as ImageIcon, Loader2, Plus, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SimpleCharacterCreator = ({ onCharacterCreated }) => {
+  const { token, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -143,7 +145,8 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
       const response = await fetch('http://localhost:3001/api/characters/generate-image', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(requestData)
       });
@@ -300,9 +303,17 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
                 id="prompt"
                 value={formData.prompt}
                 onChange={(e) => handleInputChange('prompt', e.target.value)}
-                placeholder="Describe your character: A professional journalist with dark hair and blue eyes, wearing a navy blazer..."
+                placeholder={formData.imageUrl ? 
+                  "Describe the setting and pose: A professional journalist in a modern office, wearing a navy blazer, confident pose..." : 
+                  "Describe your character: A professional journalist with dark hair and blue eyes, wearing a navy blazer..."
+                }
                 className="mt-1 min-h-[100px]"
               />
+              {formData.imageUrl && (
+                <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded mt-2">
+                  💡 <strong>Tip:</strong> Since you're using a face reference image, focus your prompt on the setting, clothing, and pose rather than facial features. The face will come from your uploaded image.
+                </p>
+              )}
             </div>
 
             <div>

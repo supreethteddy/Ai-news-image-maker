@@ -181,10 +181,10 @@ class ApiClient {
     });
   }
 
-  async generateImage(prompt, options = {}) {
+  async generateImage(prompt, options = {}, characterReferenceImages = []) {
     return this.request('/ai/generate-image', {
       method: 'POST',
-      body: JSON.stringify({ prompt, options }),
+      body: JSON.stringify({ prompt, options, character_reference_images: characterReferenceImages }),
     });
   }
 

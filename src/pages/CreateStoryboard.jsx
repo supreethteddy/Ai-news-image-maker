@@ -151,11 +151,11 @@ export default function CreateStoryboard() {
       // Step 1: AI analysis
       const llmResponse = await InvokeLLM({
         prompt: `
-          Analyze this story and create a visual storyboard with 4-8 scenes.
+          Analyze this story and create a SINGLE visual scene.
 
-          Create detailed character descriptions if characters exist, and generate specific visual prompts for each scene.
+          Create detailed character descriptions if characters exist, and generate a specific visual prompt for the scene.
 
-          For each scene provide:
+          Provide:
           1. text: 2-3 sentences describing the scene
           2. section_title: Short engaging title (3-5 words)
           3. image_prompt: Detailed visual description for image generation
@@ -169,6 +169,8 @@ export default function CreateStoryboard() {
             character_persona: { type: "string" },
             storyboard_parts: {
               type: "array",
+              minItems: 1,
+              maxItems: 1,
               items: {
                 type: "object",
                 properties: {
@@ -244,7 +246,14 @@ export default function CreateStoryboard() {
 
           console.log(`Optimized prompt: ${optimizedPrompt}`);
 
-          const imageResult = await runwareImageGeneration({ prompt: optimizedPrompt });
+          // Prepare character reference images: prefer saved face reference
+          const referenceUrl = selectedCharacter?.referenceImageUrl || selectedCharacter?.imageUrl || null;
+          const characterReferenceImages = referenceUrl ? [referenceUrl] : [];
+
+          const imageResult = await runwareImageGeneration({ 
+            prompt: optimizedPrompt,
+            characterReferenceImages: characterReferenceImages
+          });
 
           console.log(`Image result for part ${i + 1}:`, imageResult);
 

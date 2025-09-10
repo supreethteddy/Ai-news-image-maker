@@ -1,4 +1,10 @@
 import axios from 'axios';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Gemini AI Service for LLM operations
 export class GeminiService {
@@ -165,7 +171,69 @@ export class IdeogramService {
     try {
       console.log('Generating image with prompt:', prompt);
       
-      // Use the correct Ideogram API endpoint with JSON (as per official docs)
+      // If character reference images are provided, send as multipart/form-data with binary
+      if (options.character_reference_images && options.character_reference_images.length > 0) {
+        const FormData = (await import('form-data')).default;
+        const formData = new FormData();
+
+        formData.append('prompt', prompt);
+        formData.append('rendering_speed', 'TURBO');
+        formData.append('num_images', '1');
+        // Character reference only supports AUTO, REALISTIC, FICTION
+        formData.append('style_type', 'REALISTIC');
+
+        // Load first reference image (Ideogram supports one or multiple; we pass all provided)
+        for (const imageUrl of options.character_reference_images) {
+          try {
+            let buffer;
+            if (typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/')) {
+              const relativePath = imageUrl.replace('/uploads/', '');
+              const absolutePath = path.join(__dirname, '../../uploads', relativePath);
+              const fileData = await fs.readFile(absolutePath);
+              buffer = Buffer.from(fileData);
+            } else if (typeof imageUrl === 'string' && imageUrl.startsWith('http://localhost:3001/uploads/')) {
+              const relativePath = imageUrl.replace('http://localhost:3001/uploads/', '');
+              const absolutePath = path.join(__dirname, '../../uploads', relativePath);
+              const fileData = await fs.readFile(absolutePath);
+              buffer = Buffer.from(fileData);
+            } else {
+              const resp = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
+              buffer = Buffer.from(resp.data);
+            }
+            formData.append('character_reference_images', buffer, { filename: 'character_reference.jpg', contentType: 'image/jpeg' });
+          } catch (refErr) {
+            console.error('Failed to load character reference image:', refErr);
+          }
+        }
+
+        const response = await axios.post('https://api.ideogram.ai/v1/ideogram-v3/generate', formData, {
+          headers: {
+            'Api-Key': process.env.IDEOGRAM_API_KEY,
+            ...formData.getHeaders()
+          },
+          timeout: 30000
+        });
+
+        console.log('Ideogram API Response:', response.data);
+
+        if (response.data && response.data.data && response.data.data[0] && response.data.data[0].url) {
+          return {
+            success: true,
+            url: response.data.data[0].url,
+            metadata: {
+              prompt: prompt,
+              model: 'ideogram-v3',
+              dimensions: response.data.data[0].resolution || '1024x1024',
+              style: response.data.data[0].style_type || 'GENERAL',
+              seed: response.data.data[0].seed
+            }
+          };
+        } else {
+          throw new Error('Invalid response from Ideogram API');
+        }
+      }
+
+      // Fallback: JSON request without character reference
       const response = await axios.post('https://api.ideogram.ai/v1/ideogram-v3/generate', {
         prompt: prompt,
         rendering_speed: 'TURBO',
@@ -173,7 +241,7 @@ export class IdeogramService {
       }, {
         headers: {
           'Api-Key': process.env.IDEOGRAM_API_KEY,
-          'Content-Type': 'application/json'
+        	  'Content-Type': 'application/json'
         },
         timeout: 30000 // 30 seconds timeout
       });

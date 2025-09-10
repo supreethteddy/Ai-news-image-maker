@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 // Import routes
 import storyRoutes from './routes/stories.js';
 import brandRoutes from './routes/brands.js';
-import userRoutes from './routes/users.js';
+import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
 import characterRoutes from './routes/characters.js';
 import uploadRoutes from './routes/upload.js';
@@ -66,7 +66,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/stories', storyRoutes);
 app.use('/api/brands', brandRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/characters', characterRoutes);
 app.use('/api/upload', uploadRoutes);
@@ -80,9 +80,10 @@ app.get('/', (req, res) => {
       health: '/health',
       stories: '/api/stories',
       brands: '/api/brands',
-      users: '/api/users',
+      auth: '/api/auth',
       ai: '/api/ai',
-      characters: '/api/characters'
+      characters: '/api/characters',
+      upload: '/api/upload'
     }
   });
 });

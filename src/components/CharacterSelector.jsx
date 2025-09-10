@@ -8,20 +8,34 @@ import { User, Plus, Upload, Camera, Wand2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CharacterSelector = ({ selectedCharacter, onCharacterSelect, onCharacterChange }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, token } = useAuth();
   const [characters, setCharacters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Fetch characters
   const fetchCharacters = async () => {
+    if (!isAuthenticated || !token) {
+      setCharacters([]);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await fetch('/api/characters');
+      const response = await fetch('http://localhost:3001/api/characters', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (response.ok) {
         const data = await response.json();
         setCharacters(data.data || []);
+      } else if (response.status === 401) {
+        toast.error('Please log in to view your characters');
+        setCharacters([]);
+      } else {
+        toast.error('Failed to fetch characters');
       }
     } catch (error) {
       console.error('Error fetching characters:', error);
@@ -33,7 +47,7 @@ const CharacterSelector = ({ selectedCharacter, onCharacterSelect, onCharacterCh
 
   useEffect(() => {
     fetchCharacters();
-  }, []);
+  }, [isAuthenticated, token]);
 
   const handleCharacterSelect = (character) => {
     onCharacterSelect(character);

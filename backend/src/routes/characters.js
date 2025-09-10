@@ -2,13 +2,20 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import storage from '../storage/inMemoryStorage.js';
 import axios from 'axios';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { authenticateToken, optionalAuth } from '../middleware/auth.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// Get all characters
-router.get('/', async (req, res) => {
+// Get all characters for authenticated user
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const characters = storage.getCharactersByUser('demo-user');
+    const characters = storage.getCharactersByUser(req.user.userId);
     res.json({
       success: true,
       data: characters
@@ -22,8 +29,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get a specific character by ID
-router.get('/:id', async (req, res) => {
+// Get a specific character by ID (must belong to user)
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const character = storage.getCharacterById(req.params.id);
     
@@ -31,6 +38,14 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Character not found'
+      });
+    }
+
+    // Check if character belongs to the authenticated user
+    if (character.userId !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
       });
     }
 
@@ -48,7 +63,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create a new character
-router.post('/', [
+router.post('/', authenticateToken, [
   body('name').notEmpty().withMessage('Character name is required'),
   body('description').optional().isString(),
   body('imageUrl').optional().isURL().withMessage('Invalid image URL'),
@@ -69,7 +84,7 @@ router.post('/', [
 
     const characterData = {
       ...req.body,
-      userId: 'demo-user',
+      userId: req.user.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -91,7 +106,7 @@ router.post('/', [
 });
 
 // Update a character
-router.put('/:id', [
+router.put('/:id', authenticateToken, [
   body('name').optional().notEmpty().withMessage('Character name cannot be empty'),
   body('description').optional().isString(),
   body('imageUrl').optional().isURL().withMessage('Invalid image URL'),
@@ -118,6 +133,14 @@ router.put('/:id', [
       });
     }
 
+    // Check if character belongs to the authenticated user
+    if (character.userId !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
     const updateData = {
       ...req.body,
       updatedAt: new Date().toISOString()
@@ -140,7 +163,7 @@ router.put('/:id', [
 });
 
 // Delete a character
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const character = storage.getCharacterById(req.params.id);
     
@@ -148,6 +171,14 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Character not found'
+      });
+    }
+
+    // Check if character belongs to the authenticated user
+    if (character.userId !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
       });
     }
 
@@ -167,7 +198,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Generate character from description
-router.post('/generate', [
+router.post('/generate', authenticateToken, [
   body('description').notEmpty().withMessage('Character description is required'),
   body('name').notEmpty().withMessage('Character name is required'),
   body('style').optional().isString()
@@ -192,7 +223,7 @@ router.post('/generate', [
       description,
       imagePrompt,
       source: 'generated',
-      userId: 'demo-user',
+      userId: req.user.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -214,7 +245,7 @@ router.post('/generate', [
 });
 
 // Generate character image using Ideogram API with character reference
-router.post('/generate-image', [
+router.post('/generate-image', authenticateToken, [
   body('prompt').notEmpty().withMessage('Character prompt is required'),
   body('name').notEmpty().withMessage('Character name is required'),
   body('style').optional().isString()
@@ -232,7 +263,14 @@ router.post('/generate-image', [
     const { prompt, name, style = 'realistic', imageUrl } = req.body;
 
     // Enhanced prompt for character generation
-    const enhancedPrompt = `${prompt}. Professional photography, high quality, detailed facial features, consistent character design.`;
+    let enhancedPrompt;
+    if (imageUrl) {
+      // When using face reference, focus on scene/setting rather than face description
+      enhancedPrompt = `${prompt}. Professional photography, high quality, consistent character design, clean background.`;
+    } else {
+      // When no face reference, include facial features in prompt
+      enhancedPrompt = `${prompt}. Professional photography, high quality, detailed facial features, consistent character design.`;
+    }
 
     console.log('Generating character image with prompt:', enhancedPrompt);
 
@@ -244,19 +282,35 @@ router.post('/generate-image', [
       style_type: style.toUpperCase()
     };
 
-    // If we have an image URL, download it and use as character reference
+    // If we have an image URL, obtain it (local disk for /uploads, otherwise HTTP)
     let characterReferenceBuffer = null;
     if (imageUrl) {
       try {
-        console.log('Downloading character reference image:', imageUrl);
-        const imageResponse = await axios.get(imageUrl, {
-          responseType: 'arraybuffer',
-          timeout: 10000
-        });
-        characterReferenceBuffer = Buffer.from(imageResponse.data);
-        console.log('Character reference image downloaded successfully');
+        if (imageUrl.startsWith('/uploads/')) {
+          const relativePath = imageUrl.replace('/uploads/', '');
+          const absolutePath = path.join(__dirname, '../../uploads', relativePath);
+          console.log('Reading character reference image from disk:', absolutePath);
+          const fileData = await fs.readFile(absolutePath);
+          characterReferenceBuffer = Buffer.from(fileData);
+          console.log('Character reference image loaded from disk successfully');
+        } else if (imageUrl.startsWith('http://localhost:3001/uploads/')) {
+          const relativePath = imageUrl.replace('http://localhost:3001/uploads/', '');
+          const absolutePath = path.join(__dirname, '../../uploads', relativePath);
+          console.log('Reading character reference image from disk:', absolutePath);
+          const fileData = await fs.readFile(absolutePath);
+          characterReferenceBuffer = Buffer.from(fileData);
+          console.log('Character reference image loaded from disk successfully');
+        } else {
+          console.log('Downloading character reference image:', imageUrl);
+          const imageResponse = await axios.get(imageUrl, {
+            responseType: 'arraybuffer',
+            timeout: 15000
+          });
+          characterReferenceBuffer = Buffer.from(imageResponse.data);
+          console.log('Character reference image downloaded successfully');
+        }
       } catch (error) {
-        console.error('Error downloading character reference image:', error);
+        console.error('Error obtaining character reference image:', error);
         // Continue without character reference if download fails
       }
     }
@@ -305,9 +359,11 @@ router.post('/generate-image', [
         name,
         description: prompt,
         imageUrl: imageData.url,
+        // Persist the original face reference if provided so future generations can reuse it
+        referenceImageUrl: imageUrl || null,
         imagePrompt: enhancedPrompt,
         source: characterReferenceBuffer ? 'upload' : 'generated',
-        userId: 'demo-user',
+        userId: req.user.userId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -330,8 +386,9 @@ router.post('/generate-image', [
       name: req.body.name,
       description: req.body.prompt,
       imagePrompt: req.body.prompt,
+      referenceImageUrl: req.body.imageUrl || null,
       source: 'generated',
-      userId: 'demo-user',
+      userId: req.user.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -343,6 +400,54 @@ router.post('/generate-image', [
       data: character,
       message: 'Character created (image generation failed)',
       warning: 'Image generation failed, but character was saved'
+    });
+  }
+});
+
+// Download character image proxy endpoint
+router.get('/:id/download', authenticateToken, async (req, res) => {
+  try {
+    const character = storage.getCharacterById(req.params.id);
+    
+    if (!character) {
+      return res.status(404).json({
+        success: false,
+        message: 'Character not found'
+      });
+    }
+
+    // Check if character belongs to the authenticated user
+    if (character.userId !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    if (!character.imageUrl) {
+      return res.status(404).json({
+        success: false,
+        message: 'Character has no image'
+      });
+    }
+
+    // Download the image from the external URL
+    const imageResponse = await axios.get(character.imageUrl, {
+      responseType: 'stream',
+      timeout: 30000
+    });
+
+    // Set appropriate headers for download
+    res.setHeader('Content-Type', imageResponse.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Content-Disposition', `attachment; filename="${character.name}-character-image.jpg"`);
+    
+    // Pipe the image stream to the response
+    imageResponse.data.pipe(res);
+  } catch (error) {
+    console.error('Error downloading character image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to download image'
     });
   }
 });

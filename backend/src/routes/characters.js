@@ -1,14 +1,13 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
-import { authenticateToken } from '../middleware/auth.js';
 import storage from '../storage/inMemoryStorage.js';
 
 const router = express.Router();
 
-// Get all characters for authenticated user
-router.get('/', authenticateToken, async (req, res) => {
+// Get all characters
+router.get('/', async (req, res) => {
   try {
-    const characters = storage.getCharactersByUser(req.user.id);
+    const characters = storage.getCharactersByUser('demo-user');
     res.json({
       success: true,
       data: characters
@@ -23,7 +22,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get a specific character by ID
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const character = storage.getCharacterById(req.params.id);
     
@@ -31,14 +30,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Character not found'
-      });
-    }
-
-    // Check if character belongs to user
-    if (character.userId !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
       });
     }
 
@@ -56,7 +47,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Create a new character
-router.post('/', authenticateToken, [
+router.post('/', [
   body('name').notEmpty().withMessage('Character name is required'),
   body('description').optional().isString(),
   body('imageUrl').optional().isURL().withMessage('Invalid image URL'),
@@ -77,7 +68,7 @@ router.post('/', authenticateToken, [
 
     const characterData = {
       ...req.body,
-      userId: req.user.id,
+      userId: 'demo-user',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -99,7 +90,7 @@ router.post('/', authenticateToken, [
 });
 
 // Update a character
-router.put('/:id', authenticateToken, [
+router.put('/:id', [
   body('name').optional().notEmpty().withMessage('Character name cannot be empty'),
   body('description').optional().isString(),
   body('imageUrl').optional().isURL().withMessage('Invalid image URL'),
@@ -126,14 +117,6 @@ router.put('/:id', authenticateToken, [
       });
     }
 
-    // Check if character belongs to user
-    if (character.userId !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
     const updateData = {
       ...req.body,
       updatedAt: new Date().toISOString()
@@ -156,7 +139,7 @@ router.put('/:id', authenticateToken, [
 });
 
 // Delete a character
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const character = storage.getCharacterById(req.params.id);
     
@@ -164,14 +147,6 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Character not found'
-      });
-    }
-
-    // Check if character belongs to user
-    if (character.userId !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
       });
     }
 
@@ -191,7 +166,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // Generate character from description
-router.post('/generate', authenticateToken, [
+router.post('/generate', [
   body('description').notEmpty().withMessage('Character description is required'),
   body('name').notEmpty().withMessage('Character name is required'),
   body('style').optional().isString()
@@ -211,14 +186,12 @@ router.post('/generate', authenticateToken, [
     // Generate image prompt for the character
     const imagePrompt = `A ${style} portrait of ${name}: ${description}. Professional photography, high quality, detailed facial features, consistent character design.`;
 
-    // For now, we'll return the prompt. In a real implementation, you'd call the AI service
-    // to generate the actual image
     const characterData = {
       name,
       description,
       imagePrompt,
       source: 'generated',
-      userId: req.user.id,
+      userId: 'demo-user',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

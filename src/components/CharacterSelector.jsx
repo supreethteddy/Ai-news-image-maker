@@ -15,15 +15,9 @@ const CharacterSelector = ({ selectedCharacter, onCharacterSelect, onCharacterCh
 
   // Fetch characters
   const fetchCharacters = async () => {
-    if (!isAuthenticated) return;
-    
     try {
       setLoading(true);
-      const response = await fetch('/api/characters', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetch('/api/characters');
       
       if (response.ok) {
         const data = await response.json();
@@ -39,7 +33,7 @@ const CharacterSelector = ({ selectedCharacter, onCharacterSelect, onCharacterCh
 
   useEffect(() => {
     fetchCharacters();
-  }, [isAuthenticated]);
+  }, []);
 
   const handleCharacterSelect = (character) => {
     onCharacterSelect(character);
@@ -65,17 +59,6 @@ const CharacterSelector = ({ selectedCharacter, onCharacterSelect, onCharacterCh
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="text-center py-4">
-        <p className="text-gray-600 mb-2">Please log in to use characters</p>
-        <Button variant="outline" onClick={() => onCharacterChange?.()}>
-          <User className="w-4 h-4 mr-2" />
-          Login to Access Characters
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">

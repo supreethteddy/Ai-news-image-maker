@@ -30,15 +30,9 @@ const CharacterManagement = () => {
 
   // Fetch characters
   const fetchCharacters = async () => {
-    if (!isAuthenticated) return;
-    
     try {
       setLoading(true);
-      const response = await fetch('/api/characters', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await fetch('/api/characters');
       
       if (response.ok) {
         const data = await response.json();
@@ -54,7 +48,7 @@ const CharacterManagement = () => {
 
   useEffect(() => {
     fetchCharacters();
-  }, [isAuthenticated]);
+  }, []);
 
   // Create character
   const handleCreateCharacter = async (e) => {
@@ -65,8 +59,7 @@ const CharacterManagement = () => {
       const response = await fetch('/api/characters', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(formData)
       });
@@ -98,8 +91,7 @@ const CharacterManagement = () => {
       const response = await fetch(`/api/characters/${editingCharacter.id}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(formData)
       });
@@ -132,10 +124,7 @@ const CharacterManagement = () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/characters/${characterId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        method: 'DELETE'
       });
 
       if (response.ok) {
@@ -165,8 +154,7 @@ const CharacterManagement = () => {
       const response = await fetch('/api/characters/generate', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           name: formData.name,
@@ -237,20 +225,6 @@ const CharacterManagement = () => {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="w-96">
-          <CardHeader>
-            <CardTitle>Authentication Required</CardTitle>
-            <CardDescription>
-              Please log in to manage your characters.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto px-4 py-8">

@@ -94,7 +94,7 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
     uploadFormData.append('image', formData.imageFile);
 
     try {
-      const response = await fetch('/api/upload/character-image', {
+      const response = await fetch('http://localhost:3001/api/upload/character-image', {
         method: 'POST',
         body: uploadFormData
       });
@@ -118,41 +118,54 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
       return;
     }
 
+    console.log('Starting character generation with data:', formData);
     setLoading(true);
     try {
       let imageUrl = null;
       
       // Upload image if provided
       if (formData.imageFile) {
+        console.log('Uploading image...');
         imageUrl = await uploadImage();
+        console.log('Image uploaded, URL:', imageUrl);
       }
 
       // Generate character with Ideogram API
-      const response = await fetch('/api/characters/generate-image', {
+      console.log('Calling character generation API...');
+      const requestData = {
+        name: formData.name,
+        prompt: formData.prompt,
+        style: formData.style,
+        imageUrl: imageUrl
+      };
+      console.log('Request data:', requestData);
+
+      const response = await fetch('http://localhost:3001/api/characters/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          name: formData.name,
-          prompt: formData.prompt,
-          style: formData.style,
-          imageUrl: imageUrl
-        })
+        body: JSON.stringify(requestData)
       });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Character created successfully:', data);
         toast.success('Character created successfully!');
         onCharacterCreated?.(data.data);
         setIsOpen(false);
         resetForm();
       } else {
-        throw new Error('Failed to create character');
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        toast.error(`Failed to create character: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error creating character:', error);
-      toast.error('Failed to create character');
+      toast.error('Failed to create character: ' + error.message);
     } finally {
       setLoading(false);
     }

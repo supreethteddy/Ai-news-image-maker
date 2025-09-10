@@ -14,7 +14,7 @@ const CharacterManagement = () => {
   const fetchCharacters = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/characters');
+      const response = await fetch('http://localhost:3001/api/characters');
       
       if (response.ok) {
         const data = await response.json();
@@ -44,7 +44,7 @@ const CharacterManagement = () => {
     
     try {
       setLoading(true);
-      const response = await fetch(`/api/characters/${characterId}`, {
+      const response = await fetch(`http://localhost:3001/api/characters/${characterId}`, {
         method: 'DELETE'
       });
 

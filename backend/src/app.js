@@ -12,6 +12,7 @@ import brandRoutes from './routes/brands.js';
 import userRoutes from './routes/users.js';
 import aiRoutes from './routes/ai.js';
 import characterRoutes from './routes/characters.js';
+import uploadRoutes from './routes/upload.js';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -68,6 +69,7 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/characters', characterRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

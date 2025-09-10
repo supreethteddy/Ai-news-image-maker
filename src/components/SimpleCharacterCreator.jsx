@@ -136,7 +136,7 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
         name: formData.name,
         prompt: formData.prompt,
         style: formData.style,
-        imageUrl: imageUrl
+        imageUrl: imageUrl // This will be used as character_reference_images
       };
       console.log('Request data:', requestData);
 

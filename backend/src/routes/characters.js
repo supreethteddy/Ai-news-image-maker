@@ -213,7 +213,7 @@ router.post('/generate', [
   }
 });
 
-// Generate character image using Ideogram API
+// Generate character image using Ideogram API with character reference
 router.post('/generate-image', [
   body('prompt').notEmpty().withMessage('Character prompt is required'),
   body('name').notEmpty().withMessage('Character name is required'),
@@ -229,25 +229,73 @@ router.post('/generate-image', [
       });
     }
 
-    const { prompt, name, style = 'realistic' } = req.body;
+    const { prompt, name, style = 'realistic', imageUrl } = req.body;
 
     // Enhanced prompt for character generation
-    const enhancedPrompt = `A ${style} portrait of ${name}: ${prompt}. Professional photography, high quality, detailed facial features, consistent character design, clean background.`;
+    const enhancedPrompt = `${prompt}. Professional photography, high quality, detailed facial features, consistent character design.`;
 
     console.log('Generating character image with prompt:', enhancedPrompt);
 
-    // Call Ideogram API
-    const ideogramResponse = await axios.post('https://api.ideogram.ai/v1/ideogram-v3/generate', {
+    // Prepare the request data
+    const requestData = {
       prompt: enhancedPrompt,
       rendering_speed: 'TURBO',
-      num_images: 1
-    }, {
-      headers: {
-        'Api-Key': process.env.IDEOGRAM_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000
-    });
+      num_images: 1,
+      style_type: style.toUpperCase()
+    };
+
+    // If we have an image URL, download it and use as character reference
+    let characterReferenceBuffer = null;
+    if (imageUrl) {
+      try {
+        console.log('Downloading character reference image:', imageUrl);
+        const imageResponse = await axios.get(imageUrl, {
+          responseType: 'arraybuffer',
+          timeout: 10000
+        });
+        characterReferenceBuffer = Buffer.from(imageResponse.data);
+        console.log('Character reference image downloaded successfully');
+      } catch (error) {
+        console.error('Error downloading character reference image:', error);
+        // Continue without character reference if download fails
+      }
+    }
+
+    // Call Ideogram API
+    let ideogramResponse;
+    if (characterReferenceBuffer) {
+      // Use FormData for file upload
+      const FormData = (await import('form-data')).default;
+      const formData = new FormData();
+      
+      formData.append('prompt', enhancedPrompt);
+      formData.append('rendering_speed', 'TURBO');
+      formData.append('num_images', '1');
+      formData.append('style_type', style.toUpperCase());
+      formData.append('character_reference_images', characterReferenceBuffer, {
+        filename: 'character_reference.jpg',
+        contentType: 'image/jpeg'
+      });
+
+      console.log('Calling Ideogram API with character reference image');
+      ideogramResponse = await axios.post('https://api.ideogram.ai/v1/ideogram-v3/generate', formData, {
+        headers: {
+          'Api-Key': process.env.IDEOGRAM_API_KEY,
+          ...formData.getHeaders()
+        },
+        timeout: 30000
+      });
+    } else {
+      // Fallback to JSON request without character reference
+      console.log('Calling Ideogram API without character reference');
+      ideogramResponse = await axios.post('https://api.ideogram.ai/v1/ideogram-v3/generate', requestData, {
+        headers: {
+          'Api-Key': process.env.IDEOGRAM_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      });
+    }
 
     if (ideogramResponse.data && ideogramResponse.data.data && ideogramResponse.data.data[0]) {
       const imageData = ideogramResponse.data.data[0];
@@ -258,7 +306,7 @@ router.post('/generate-image', [
         description: prompt,
         imageUrl: imageData.url,
         imagePrompt: enhancedPrompt,
-        source: 'generated',
+        source: characterReferenceBuffer ? 'upload' : 'generated',
         userId: 'demo-user',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -269,7 +317,7 @@ router.post('/generate-image', [
       res.status(201).json({
         success: true,
         data: character,
-        message: 'Character generated successfully'
+        message: 'Character generated successfully with reference image'
       });
     } else {
       throw new Error('Invalid response from Ideogram API');

@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import StoryboardDisplay from "../components/storyboard/StoryboardDisplay";
 import SimplifiedCreativeBrief from "../components/creation/SimplifiedCreativeBrief";
 import { VISUAL_STYLES, COLOR_THEMES } from "../components/creation/StyleSelector";
+import CharacterSelector from "../components/CharacterSelector";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function CreateStoryboard() {
@@ -21,10 +22,31 @@ export default function CreateStoryboard() {
   const [errorMessage, setErrorMessage] = useState("");
   const [showCreativeBrief, setShowCreativeBrief] = useState(false);
   const [creativeBriefData, setCreativeBriefData] = useState(null);
+  const [selectedCharacter, setSelectedCharacter] = useState(null);
   const { isAuthenticated } = useAuth();
 
   // Character consistency helper
   const extractCharacterReference = (characterPersona) => {
+    // If a character is selected, use its information
+    if (selectedCharacter) {
+      let reference = `${selectedCharacter.name}`;
+      
+      if (selectedCharacter.appearance) {
+        reference += `, ${selectedCharacter.appearance}`;
+      }
+      
+      if (selectedCharacter.personality) {
+        reference += `, ${selectedCharacter.personality}`;
+      }
+      
+      if (selectedCharacter.description) {
+        reference += `. ${selectedCharacter.description}`;
+      }
+      
+      return reference.substring(0, 200);
+    }
+
+    // Fallback to original logic if no character selected
     if (!characterPersona || typeof characterPersona !== 'string') return "";
 
     try {
@@ -450,6 +472,21 @@ export default function CreateStoryboard() {
                 />
                 <p className="text-xs md:text-sm text-slate-500 px-1">
                   💡 Tip: Longer, more detailed stories create richer visual storyboards! Every scene will be visualized.
+                </p>
+              </div>
+
+              {/* Character Selection */}
+              <div className="space-y-3">
+                <Label className="text-slate-700 font-semibold text-base md:text-lg">
+                  Character Selection (Optional)
+                </Label>
+                <CharacterSelector
+                  selectedCharacter={selectedCharacter}
+                  onCharacterSelect={setSelectedCharacter}
+                  onCharacterChange={() => setSelectedCharacter(null)}
+                />
+                <p className="text-xs md:text-sm text-slate-500 px-1">
+                  🎭 Select a character to ensure consistent visual appearance across all storyboard images.
                 </p>
               </div>
 

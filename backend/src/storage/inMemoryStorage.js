@@ -4,6 +4,7 @@ class InMemoryStorage {
     this.stories = new Map();
     this.brandProfiles = new Map();
     this.users = new Map();
+    this.characters = new Map();
     this.nextId = 1;
   }
 
@@ -143,11 +144,52 @@ class InMemoryStorage {
     return this.users.delete(id);
   }
 
+  // Character operations
+  createCharacter(data) {
+    const id = `character_${this.nextId++}`;
+    const character = {
+      id,
+      ...data,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    this.characters.set(id, character);
+    return character;
+  }
+
+  getCharacterById(id) {
+    return this.characters.get(id);
+  }
+
+  updateCharacter(id, data) {
+    const character = this.characters.get(id);
+    if (!character) return null;
+    
+    const updatedCharacter = {
+      ...character,
+      ...data,
+      updated_at: new Date().toISOString()
+    };
+    this.characters.set(id, updatedCharacter);
+    return updatedCharacter;
+  }
+
+  deleteCharacter(id) {
+    return this.characters.delete(id);
+  }
+
+  getCharactersByUser(userId) {
+    return Array.from(this.characters.values())
+      .filter(character => character.userId === userId)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+
   // Utility methods
   clear() {
     this.stories.clear();
     this.brandProfiles.clear();
     this.users.clear();
+    this.characters.clear();
     this.nextId = 1;
   }
 
@@ -155,7 +197,8 @@ class InMemoryStorage {
     return {
       stories: this.stories.size,
       brandProfiles: this.brandProfiles.size,
-      users: this.users.size
+      users: this.users.size,
+      characters: this.characters.size
     };
   }
 }
@@ -163,4 +206,6 @@ class InMemoryStorage {
 // Create singleton instance
 const storage = new InMemoryStorage();
 
+// Export both the class and the instance
+export { InMemoryStorage as CharacterStorage };
 export default storage;

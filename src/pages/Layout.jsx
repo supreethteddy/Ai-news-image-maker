@@ -33,6 +33,11 @@ const navigationItems = [
   title: "My Storyboards",
   url: createPageUrl("MyStoryboards"),
   icon: () => <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/8111d62e6_2.png" alt="My Storyboards" className="w-5 h-5" />
+},
+{
+  title: "Characters",
+  url: createPageUrl("CharacterManagement"),
+  icon: () => <User className="w-5 h-5" />
 }];
 
 

@@ -11,6 +11,7 @@ import storyRoutes from './routes/stories.js';
 import brandRoutes from './routes/brands.js';
 import userRoutes from './routes/users.js';
 import aiRoutes from './routes/ai.js';
+import characterRoutes from './routes/characters.js';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -66,6 +67,7 @@ app.use('/api/stories', storyRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/characters', characterRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -77,7 +79,8 @@ app.get('/', (req, res) => {
       stories: '/api/stories',
       brands: '/api/brands',
       users: '/api/users',
-      ai: '/api/ai'
+      ai: '/api/ai',
+      characters: '/api/characters'
     }
   });
 });

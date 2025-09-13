@@ -1,13 +1,9 @@
 import Layout from "./Layout.jsx";
-
+import LandingPage from "./LandingPage";
 import CreateStoryboard from "./CreateStoryboard";
-
 import MyStoryboards from "./MyStoryboards";
-
 import ViewStoryboard from "./ViewStoryboard";
-
 import CharacterManagement from "./CharacterManagement";
-
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -40,21 +36,20 @@ function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
     
+    // Check if we're on the landing page
+    const isLandingPage = location.pathname === '/';
+    
+    if (isLandingPage) {
+        return <LandingPage />;
+    }
+    
     return (
         <Layout currentPageName={currentPage}>
             <Routes>            
-                
-                    <Route path="/" element={<CreateStoryboard />} />
-                
-                
                 <Route path="/CreateStoryboard" element={<CreateStoryboard />} />
-                
                 <Route path="/MyStoryboards" element={<MyStoryboards />} />
-                
                 <Route path="/ViewStoryboard" element={<ViewStoryboard />} />
-                
                 <Route path="/CharacterManagement" element={<CharacterManagement />} />
-                
             </Routes>
         </Layout>
     );

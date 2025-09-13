@@ -1,30 +1,31 @@
 // API Client for NewsPlay Backend
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const TOKEN_KEY = 'supabase_token';
 
 class ApiClient {
   constructor() {
     this.baseURL = API_BASE_URL;
-    this.token = localStorage.getItem('newsplay_token');
+    this.token = localStorage.getItem(TOKEN_KEY);
   }
 
   setToken(token) {
     this.token = token;
     if (token) {
-      localStorage.setItem('newsplay_token', token);
+      localStorage.setItem(TOKEN_KEY, token);
     } else {
-      localStorage.removeItem('newsplay_token');
+      localStorage.removeItem(TOKEN_KEY);
     }
   }
 
   getHeaders() {
+    // Always read the freshest token from localStorage to survive page reloads
+    const currentToken = this.token || localStorage.getItem(TOKEN_KEY);
     const headers = {
       'Content-Type': 'application/json',
     };
-    
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    if (currentToken) {
+      headers['Authorization'] = `Bearer ${currentToken}`;
     }
-    
     return headers;
   }
 
@@ -88,35 +89,35 @@ class ApiClient {
 
   // Story methods
   async getStories() {
-    return this.request('/stories');
+    return this.request('/storyboards');
   }
 
   async getStory(id) {
-    return this.request(`/stories/${id}`);
+    return this.request(`/storyboards/${id}`);
   }
 
   async createStory(storyData) {
-    return this.request('/stories', {
+    return this.request('/storyboards', {
       method: 'POST',
       body: JSON.stringify(storyData),
     });
   }
 
   async updateStory(id, storyData) {
-    return this.request(`/stories/${id}`, {
+    return this.request(`/storyboards/${id}`, {
       method: 'PUT',
       body: JSON.stringify(storyData),
     });
   }
 
   async deleteStory(id) {
-    return this.request(`/stories/${id}`, {
+    return this.request(`/storyboards/${id}`, {
       method: 'DELETE',
     });
   }
 
   async regenerateImage(storyId, partIndex, promptOverride = null) {
-    return this.request(`/stories/${storyId}/regenerate-image`, {
+    return this.request(`/storyboards/${storyId}/regenerate-image`, {
       method: 'POST',
       body: JSON.stringify({ partIndex, promptOverride }),
     });
@@ -181,10 +182,16 @@ class ApiClient {
     });
   }
 
-  async generateImage(prompt, options = {}, characterReferenceImages = []) {
+  async generateImage(prompt, options = {}, characterReferenceImages = [], logoUrl = null, includeLogo = false) {
     return this.request('/ai/generate-image', {
       method: 'POST',
-      body: JSON.stringify({ prompt, options, character_reference_images: characterReferenceImages }),
+      body: JSON.stringify({ 
+        prompt, 
+        options, 
+        character_reference_images: characterReferenceImages,
+        logoUrl,
+        includeLogo
+      }),
     });
   }
 

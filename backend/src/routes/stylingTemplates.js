@@ -2,6 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth.js';
 import storage from '../storage/inMemoryStorage.js';
+import storageService from '../services/storageService.js';
 
 const router = express.Router();
 
@@ -73,14 +74,38 @@ router.post('/', authenticateToken, [
       });
     }
 
-    const { name, visualStyle, colorTheme, logoUrl, description } = req.body;
+    const { name, visualStyle, colorTheme, logoUrl, includeLogo, description } = req.body;
+
+    // Upload logo to Supabase Storage if provided
+    let finalLogoUrl = logoUrl || null;
+    if (logoUrl) {
+      try {
+        console.log('📤 Uploading logo to Supabase Storage...');
+        const uploadResult = await storageService.uploadStylingLogo(
+          logoUrl,
+          req.user.userId,
+          name
+        );
+        
+        if (uploadResult.success) {
+          console.log('✅ Logo uploaded to Supabase Storage:', uploadResult.publicUrl);
+          finalLogoUrl = uploadResult.publicUrl;
+        } else {
+          console.log('⚠️ Failed to upload logo to Supabase Storage, using original URL:', uploadResult.error);
+        }
+      } catch (uploadError) {
+        console.log('⚠️ Error uploading logo to Supabase Storage:', uploadError.message);
+      }
+    }
 
     const templateData = {
       name,
       visualStyle,
       colorTheme,
-      logoUrl: logoUrl || null,
+      logoUrl: finalLogoUrl,
+      includeLogo: includeLogo || false,
       description: description || '',
+      isDefault: false, // New templates are not default by default
       userId: req.user.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -106,7 +131,8 @@ router.post('/', authenticateToken, [
 router.put('/:id', authenticateToken, [
   body('name').optional().notEmpty().withMessage('Name cannot be empty'),
   body('visualStyle').optional().notEmpty().withMessage('Visual style cannot be empty'),
-  body('colorTheme').optional().notEmpty().withMessage('Color theme cannot be empty')
+  body('colorTheme').optional().notEmpty().withMessage('Color theme cannot be empty'),
+  body('isDefault').optional().isBoolean()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -132,6 +158,16 @@ router.put('/:id', authenticateToken, [
       return res.status(403).json({
         success: false,
         message: 'Access denied'
+      });
+    }
+
+    // If setting as default, unset all other templates for this user as default
+    if (req.body.isDefault === true) {
+      const userTemplates = storage.getStylingTemplatesByUser(req.user.userId);
+      userTemplates.forEach(userTemplate => {
+        if (userTemplate.id !== req.params.id && userTemplate.isDefault) {
+          storage.updateStylingTemplate(userTemplate.id, { isDefault: false });
+        }
       });
     }
 

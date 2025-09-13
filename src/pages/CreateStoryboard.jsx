@@ -24,7 +24,7 @@ export default function CreateStoryboard() {
   const [showCreativeBrief, setShowCreativeBrief] = useState(false);
   const [creativeBriefData, setCreativeBriefData] = useState(null);
   const [selectedCharacter, setSelectedCharacter] = useState(null);
-  const { isAuthenticated, token } = useAuth();
+  const { isAuthenticated, token, user, logout } = useAuth();
 
   // Character consistency helper
   const extractCharacterReference = (characterPersona) => {
@@ -71,7 +71,7 @@ export default function CreateStoryboard() {
   };
 
   // Smart prompt builder with FIXED length management
-  const buildOptimizedPrompt = (scenePrompt, characterRef, visualStyle, colorTheme, logoUrl = null) => {
+  const buildOptimizedPrompt = (scenePrompt, characterRef, visualStyle, colorTheme, logoUrl = null, includeLogo = false) => {
     const MAX_PROMPT_LENGTH = 300; // Reduced to be more conservative
     
     // Ensure all inputs are safe strings
@@ -91,8 +91,8 @@ export default function CreateStoryboard() {
     const styleModifier = (styleData?.prompt || "high quality, detailed").substring(0, 50);
     const colorModifier = (colorData?.prompt || "balanced colors").substring(0, 50);
     
-    // Add logo context if available
-    const logoContext = logoUrl ? " featuring company branding and logo" : "";
+    // Add logo context if available and user wants it included
+    const logoContext = (logoUrl && includeLogo) ? " with company logo in top-left corner" : "";
 
     // Build prompt more carefully
     let prompt = safeScenePrompt;
@@ -114,12 +114,18 @@ export default function CreateStoryboard() {
       prompt += `. ${shortCharRef}`;
     }
 
-    // Add modifiers if there's room
-    const remainingSpace = MAX_PROMPT_LENGTH - prompt.length - 10; // Leave buffer
-    if (remainingSpace > colorModifier.length + styleModifier.length + logoContext.length + 10) {
-      prompt += `. ${colorModifier}. ${styleModifier}${logoContext}`;
-    } else if (remainingSpace > 20) { // If not enough for both, but some space
-      prompt += ". High quality, detailed";
+    // Always include concise style and color cues so API honors selection
+    const condensedStyle = styleModifier.split(',').slice(0, 2).join(', ');
+    const condensedColor = colorModifier.split(',').slice(0, 2).join(', ');
+    prompt += `. ${condensedColor}. ${condensedStyle}${logoContext}`;
+
+    // Final length guard
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      prompt = `${prompt.substring(0, MAX_PROMPT_LENGTH - 1)}`;
+      const cut = prompt.lastIndexOf(' ');
+      if (cut > MAX_PROMPT_LENGTH - 60) {
+        prompt = prompt.substring(0, cut);
+      }
     }
 
     return prompt.trim();
@@ -290,18 +296,27 @@ export default function CreateStoryboard() {
             characterRef,
             creativeBriefData?.visualStyle || "realistic",
             creativeBriefData?.colorTheme || "modern",
-            creativeBriefData?.logoUrl
+            creativeBriefData?.logoUrl,
+            creativeBriefData?.includeLogo
           );
 
           console.log(`Optimized prompt: ${optimizedPrompt}`);
 
-          // Prepare character reference images: prefer saved face reference
-          const referenceUrl = selectedCharacter?.referenceImageUrl || selectedCharacter?.imageUrl || null;
+          // Prepare character reference images: handle snake_case as well
+          const referenceUrl = 
+            selectedCharacter?.referenceImageUrl ||
+            selectedCharacter?.reference_image_url ||
+            selectedCharacter?.imageUrl ||
+            selectedCharacter?.image_url ||
+            null;
           const characterReferenceImages = referenceUrl ? [referenceUrl] : [];
 
           const imageResult = await runwareImageGeneration({ 
             prompt: optimizedPrompt,
-            characterReferenceImages: characterReferenceImages
+            visualStyle: creativeBriefData?.visualStyle || 'realistic',
+            characterReferenceImages: characterReferenceImages,
+            logoUrl: creativeBriefData?.logoUrl,
+            includeLogo: creativeBriefData?.includeLogo
           });
 
           console.log(`Image result for part ${i + 1}:`, imageResult);
@@ -433,6 +448,27 @@ export default function CreateStoryboard() {
               <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">NewsPlay</span>
             </h1>
           </div>
+          {user && user.name && (
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-lg md:text-xl font-semibold text-slate-700">
+                Welcome back, <span className="text-purple-600">{user.name}</span>! 👋
+              </p>
+              <button 
+                onClick={logout}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+          {!user && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Please login to access your dashboard</strong><br />
+                Your user profile will be fetched from the database after authentication.
+              </p>
+            </div>
+          )}
           <p className="text-slate-600 text-base md:text-lg lg:text-xl max-w-3xl mx-auto leading-relaxed px-4">
             Transform any story into a captivating visual experience with AI-generated storyboards and custom imagery.
           </p>

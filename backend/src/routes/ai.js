@@ -14,7 +14,9 @@ const validateStoryboardGeneration = [
 const validateImageGeneration = [
   body('prompt').notEmpty().withMessage('Image prompt is required'),
   body('options').optional().isObject(),
-  body('character_reference_images').optional().isArray()
+  body('character_reference_images').optional().isArray(),
+  body('logoUrl').optional().isString(),
+  body('includeLogo').optional().isBoolean()
 ];
 
 const validatePromptEnhancement = [
@@ -115,12 +117,17 @@ router.post('/generate-image', optionalAuth, validateImageGeneration, async (req
       });
     }
 
-    const { prompt, options = {}, character_reference_images = [] } = req.body;
+    const { prompt, options = {}, character_reference_images = [], logoUrl, includeLogo } = req.body;
 
-    // Merge character reference images into options
+    // Merge character reference images into options and add user context
     const enhancedOptions = {
       ...options,
-      character_reference_images: character_reference_images
+      character_reference_images: character_reference_images,
+      logoUrl: logoUrl,
+      includeLogo: includeLogo,
+      userId: req.user?.userId || null,
+      storyboardId: options.storyboardId || null,
+      sceneIndex: options.sceneIndex || 0
     };
 
     const imageResult = await IdeogramService.generateImage(prompt, enhancedOptions);

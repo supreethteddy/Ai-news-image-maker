@@ -30,7 +30,13 @@ const CharacterSelector = ({ selectedCharacter, onCharacterSelect, onCharacterCh
       
       if (response.ok) {
         const data = await response.json();
-        setCharacters(data.data || []);
+        // Normalize snake_case from DB to camelCase used in UI
+        const normalized = (data.data || []).map((c) => ({
+          ...c,
+          imageUrl: c.imageUrl || c.image_url || null,
+          referenceImageUrl: c.referenceImageUrl || c.reference_image_url || null,
+        }));
+        setCharacters(normalized);
       } else if (response.status === 401) {
         toast.error('Please log in to view your characters');
         setCharacters([]);
@@ -50,9 +56,15 @@ const CharacterSelector = ({ selectedCharacter, onCharacterSelect, onCharacterCh
   }, [isAuthenticated, token]);
 
   const handleCharacterSelect = (character) => {
-    onCharacterSelect(character);
+    // Ensure parent always receives normalized fields
+    const normalized = {
+      ...character,
+      imageUrl: character.imageUrl || character.image_url || null,
+      referenceImageUrl: character.referenceImageUrl || character.reference_image_url || null,
+    };
+    onCharacterSelect(normalized);
     setIsDialogOpen(false);
-    toast.success(`Selected character: ${character.name}`);
+    toast.success(`Selected character: ${normalized.name}`);
   };
 
   const getSourceIcon = (source) => {

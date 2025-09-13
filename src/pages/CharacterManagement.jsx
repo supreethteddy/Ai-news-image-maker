@@ -33,6 +33,7 @@ const CharacterManagement = () => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 Characters fetched:', data.data);
         setCharacters(data.data || []);
       } else if (response.status === 401) {
         toast.error('Please log in to view your characters');
@@ -155,6 +156,11 @@ const CharacterManagement = () => {
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold">Character Management</h1>
+              {user && user.name && (
+                <p className="text-lg font-semibold text-slate-700 mt-2">
+                  Welcome back, <span className="text-purple-600">{user.name}</span>! 👋
+                </p>
+              )}
               <p className="text-gray-600 mt-2">
                 Create and manage characters for consistent storytelling
               </p>
@@ -204,13 +210,15 @@ const CharacterManagement = () => {
                   
                   <CardContent className="pt-0">
                     {/* Character Image */}
-                    {character.imageUrl ? (
+                    {(character.imageUrl || character.image_url) ? (
                       <div className="w-full h-48 mb-4 rounded-lg overflow-hidden bg-gray-100 relative group">
                         <img 
-                          src={character.imageUrl} 
+                          src={character.imageUrl || character.image_url} 
                           alt={character.name}
                           className="w-full h-full object-cover"
+                          onLoad={() => console.log('✅ Image loaded for character:', character.name)}
                           onError={(e) => {
+                            console.log('❌ Image failed to load for character:', character.name, 'URL:', character.imageUrl || character.image_url);
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'flex';
                           }}
@@ -307,10 +315,10 @@ const CharacterManagement = () => {
                 </div>
               </DialogHeader>
               
-              {selectedImage?.imageUrl && (
+              {(selectedImage?.imageUrl || selectedImage?.image_url) && (
                 <div className="flex items-center justify-center bg-gray-100 rounded-lg overflow-hidden">
                   <img 
-                    src={selectedImage.imageUrl} 
+                    src={selectedImage.imageUrl || selectedImage.image_url} 
                     alt={selectedImage.name}
                     className="max-w-full max-h-[70vh] object-contain"
                     onError={(e) => {

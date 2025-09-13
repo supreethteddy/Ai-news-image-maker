@@ -2,14 +2,15 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 
+// Only expose styles supported by Ideogram style_type
 const VISUAL_STYLES = [
   { 
-    key: "cinematic", 
-    name: "Cinematic", 
-    description: "Movie-like quality, dramatic composition", 
-    prompt: "cinematic still, movie photography, dramatic lighting, professional cinematography",
-    icon: "🎬",
-    bgGradient: "from-slate-800 to-slate-600"
+    key: "general", 
+    name: "General", 
+    description: "Balanced, default Ideogram look", 
+    prompt: "balanced, high quality, detailed",
+    icon: "✨",
+    bgGradient: "from-slate-200 to-slate-400"
   },
   { 
     key: "realistic", 
@@ -20,25 +21,33 @@ const VISUAL_STYLES = [
     bgGradient: "from-blue-600 to-blue-400"
   },
   { 
-    key: "sketch", 
-    name: "Sketch", 
-    description: "Hand-drawn, artistic lines, pencil style", 
-    prompt: "pencil sketch, hand-drawn, artistic lines, monochrome sketch style",
-    icon: "✏️",
-    bgGradient: "from-gray-600 to-gray-400"
+    key: "illustration", 
+    name: "Illustration", 
+    description: "Digital illustration, clean artwork", 
+    prompt: "digital illustration, clean artwork, vibrant colors, smooth rendering",
+    icon: "🖼️",
+    bgGradient: "from-purple-500 to-pink-400"
   },
   { 
     key: "comic", 
     name: "Comic", 
-    description: "Comic book style, bold lines, pop art", 
+    description: "Comic book style, bold outlines", 
     prompt: "comic book style, bold outlines, flat colors, pop art aesthetic",
     icon: "💥",
     bgGradient: "from-red-500 to-yellow-400"
   },
   { 
+    key: "sketch", 
+    name: "Sketch", 
+    description: "Hand-drawn, pencil lines", 
+    prompt: "pencil sketch, hand-drawn, artistic lines, monochrome sketch style",
+    icon: "✏️",
+    bgGradient: "from-gray-600 to-gray-400"
+  },
+  { 
     key: "watercolor", 
     name: "Watercolor", 
-    description: "Soft textures, artistic brushstrokes", 
+    description: "Soft textures, brushstrokes", 
     prompt: "watercolor painting, soft brush strokes, artistic texture, painted style",
     icon: "🎨",
     bgGradient: "from-pink-400 to-purple-300"
@@ -46,26 +55,10 @@ const VISUAL_STYLES = [
   { 
     key: "vector", 
     name: "Vector", 
-    description: "Clean, geometric, no noise", 
+    description: "Clean, geometric, flat colors", 
     prompt: "vector art, clean lines, flat colors, geometric shapes, no noise, sharp edges",
     icon: "📐",
     bgGradient: "from-green-500 to-teal-400"
-  },
-  { 
-    key: "minimalist", 
-    name: "Minimalist", 
-    description: "Clean lines, simple composition", 
-    prompt: "minimalist design, clean lines, simple composition, negative space",
-    icon: "⚪",
-    bgGradient: "from-gray-100 to-gray-300"
-  },
-  { 
-    key: "illustrated", 
-    name: "Illustrated", 
-    description: "Digital illustration, vibrant colors", 
-    prompt: "digital illustration, clean artwork, vibrant colors, smooth rendering",
-    icon: "🖼️",
-    bgGradient: "from-purple-500 to-pink-400"
   }
 ];
 
@@ -133,7 +126,8 @@ export default function StyleSelector({ onStyleSelect, selectedStyle, selectedCo
     <div className="space-y-8">
       {/* Visual Style Selection */}
       <div>
-        <h3 className="text-xl font-semibold text-slate-800 mb-4">Choose Visual Style</h3>
+        <h3 className="text-xl font-semibold text-slate-800 mb-2">Choose Visual Style</h3>
+        <p className="text-xs text-slate-500 mb-4">Only styles supported by Ideogram are shown. Note: when using a character reference, Ideogram applies Realistic.</p>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {VISUAL_STYLES.map((style) => (

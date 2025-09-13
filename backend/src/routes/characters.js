@@ -1,6 +1,8 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import storage from '../storage/inMemoryStorage.js';
+import { db } from '../lib/supabase.js';
+import storageService from '../services/storageService.js';
 import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
@@ -15,11 +17,23 @@ const router = express.Router();
 // Get all characters for authenticated user
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const characters = storage.getCharactersByUser(req.user.userId);
-    res.json({
-      success: true,
-      data: characters
-    });
+    // Try Supabase first, fallback to in-memory storage
+    const { data: supabaseCharacters, error: supabaseError } = await db.characters.getAll(req.user.userId);
+    
+    if (supabaseCharacters && !supabaseError) {
+      res.json({
+        success: true,
+        data: supabaseCharacters
+      });
+    } else {
+      // Fallback to in-memory storage
+      console.log('Supabase unavailable, using in-memory storage:', supabaseError?.message);
+      const characters = storage.getCharactersByUser(req.user.userId);
+      res.json({
+        success: true,
+        data: characters
+      });
+    }
   } catch (error) {
     console.error('Error fetching characters:', error);
     res.status(500).json({
@@ -84,18 +98,35 @@ router.post('/', authenticateToken, [
 
     const characterData = {
       ...req.body,
-      userId: req.user.userId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      user_id: req.user.userId
     };
 
-    const character = storage.createCharacter(characterData);
-
-    res.status(201).json({
-      success: true,
-      data: character,
-      message: 'Character created successfully'
-    });
+    // Try Supabase first, fallback to in-memory storage
+    const { data: supabaseCharacter, error: supabaseError } = await db.characters.create(characterData);
+    
+    if (supabaseCharacter && !supabaseError) {
+      res.status(201).json({
+        success: true,
+        data: supabaseCharacter,
+        message: 'Character created successfully'
+      });
+    } else {
+      // Fallback to in-memory storage
+      console.log('Supabase unavailable, using in-memory storage:', supabaseError?.message);
+      const fallbackData = {
+        ...req.body,
+        userId: req.user.userId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      const character = storage.createCharacter(fallbackData);
+      
+      res.status(201).json({
+        success: true,
+        data: character,
+        message: 'Character created successfully'
+      });
+    }
   } catch (error) {
     console.error('Error creating character:', error);
     res.status(500).json({
@@ -262,12 +293,16 @@ router.post('/generate-image', authenticateToken, [
 
     const { prompt, name, style = 'realistic', imageUrl } = req.body;
 
+    console.log('🔍 Character generation request:', { prompt, name, style, imageUrl });
+
     // Enhanced prompt for character generation
     let enhancedPrompt;
     if (imageUrl) {
+      console.log('✅ Using character reference image:', imageUrl);
       // When using face reference, focus on scene/setting rather than face description
       enhancedPrompt = `${prompt}. Professional photography, high quality, consistent character design, clean background.`;
     } else {
+      console.log('⚠️ No character reference image provided');
       // When no face reference, include facial features in prompt
       enhancedPrompt = `${prompt}. Professional photography, high quality, detailed facial features, consistent character design.`;
     }
@@ -354,21 +389,55 @@ router.post('/generate-image', authenticateToken, [
     if (ideogramResponse.data && ideogramResponse.data.data && ideogramResponse.data.data[0]) {
       const imageData = ideogramResponse.data.data[0];
       
+      // Upload generated image to Supabase Storage
+      console.log('📤 Uploading generated image to Supabase Storage...');
+      const uploadResult = await storageService.uploadCharacterImage(
+        imageData.url, 
+        req.user.userId, 
+        name
+      );
+      
+      let finalImageUrl = imageData.url; // Fallback to original URL
+      if (uploadResult.success) {
+        console.log('✅ Image uploaded to Supabase Storage:', uploadResult.publicUrl);
+        finalImageUrl = uploadResult.publicUrl;
+      } else {
+        console.log('⚠️ Failed to upload to Supabase Storage, using original URL:', uploadResult.error);
+      }
+      
       // Create character with generated image
       const characterData = {
         name,
         description: prompt,
-        imageUrl: imageData.url,
+        image_url: finalImageUrl,
         // Persist the original face reference if provided so future generations can reuse it
-        referenceImageUrl: imageUrl || null,
-        imagePrompt: enhancedPrompt,
-        source: characterReferenceBuffer ? 'upload' : 'generated',
-        userId: req.user.userId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        reference_image_url: imageUrl || null,
+        prompt: enhancedPrompt,
+        user_id: req.user.userId
       };
 
-      const character = storage.createCharacter(characterData);
+      // Try Supabase first, fallback to in-memory storage
+      const { data: supabaseCharacter, error: supabaseError } = await db.characters.create(characterData);
+      
+      let character;
+      if (supabaseCharacter && !supabaseError) {
+        character = supabaseCharacter;
+      } else {
+        // Fallback to in-memory storage
+        console.log('Supabase unavailable, using in-memory storage:', supabaseError?.message);
+        const fallbackData = {
+          name,
+          description: prompt,
+          imageUrl: finalImageUrl,
+          referenceImageUrl: imageUrl || null,
+          imagePrompt: enhancedPrompt,
+          source: characterReferenceBuffer ? 'upload' : 'generated',
+          userId: req.user.userId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        character = storage.createCharacter(fallbackData);
+      }
 
       res.status(201).json({
         success: true,
@@ -424,7 +493,7 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
       });
     }
 
-    if (!character.imageUrl) {
+    if (!character.imageUrl && !character.image_url) {
       return res.status(404).json({
         success: false,
         message: 'Character has no image'
@@ -432,7 +501,8 @@ router.get('/:id/download', authenticateToken, async (req, res) => {
     }
 
     // Download the image from the external URL
-    const imageResponse = await axios.get(character.imageUrl, {
+    const imageUrl = character.imageUrl || character.image_url;
+    const imageResponse = await axios.get(imageUrl, {
       responseType: 'stream',
       timeout: 30000
     });

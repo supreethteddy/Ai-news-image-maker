@@ -31,6 +31,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
     visual_style: "realistic",
     color_theme: "modern",
     logoUrl: null,
+    includeLogo: false,
     description: ""
   });
 
@@ -40,6 +41,16 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
       loadStylingTemplates();
     }
   }, [isAuthenticated, token]);
+
+  // Auto-load the default template or most recent template if available
+  useEffect(() => {
+    if (stylingTemplates.length > 0 && !selectedTemplate) {
+      // First try to find a default template
+      const defaultTemplate = stylingTemplates.find(t => t.isDefault);
+      const templateToLoad = defaultTemplate || stylingTemplates[0]; // Fallback to most recent
+      loadTemplate(templateToLoad);
+    }
+  }, [stylingTemplates, selectedTemplate]);
 
   const loadBrandProfiles = async () => {
     try {
@@ -78,23 +89,32 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
   const handleLogoUpload = async (file) => {
     if (!file) return;
 
+    if (!isAuthenticated || !token) {
+      toast.error('Please log in to upload logos');
+      return;
+    }
+
     setUploadingLogo(true);
     try {
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await fetch('http://localhost:3001/api/upload/character-image', {
+      const response = await fetch('http://localhost:3001/api/upload/logo', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData
       });
 
       if (response.ok) {
         const data = await response.json();
-        setBriefData(prev => ({ ...prev, logoUrl: data.data.url }));
+        setBriefData(prev => ({ ...prev, logoUrl: data.data.logoUrl }));
         setLogoPreview(URL.createObjectURL(file));
         toast.success('Logo uploaded successfully!');
       } else {
-        toast.error('Failed to upload logo');
+        const errorData = await response.json();
+        toast.error('Failed to upload logo: ' + (errorData.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error uploading logo:', error);
@@ -127,6 +147,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
           visualStyle: briefData.visual_style,
           colorTheme: briefData.color_theme,
           logoUrl: briefData.logoUrl,
+          includeLogo: briefData.includeLogo,
           description: briefData.description
         })
       });
@@ -153,10 +174,38 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
       visual_style: template.visualStyle,
       color_theme: template.colorTheme,
       logoUrl: template.logoUrl,
+      includeLogo: template.includeLogo || false,
       description: template.description
     }));
     if (template.logoUrl) {
       setLogoPreview(template.logoUrl);
+    }
+  };
+
+  const setAsDefault = async (template) => {
+    if (!isAuthenticated || !token) return;
+    
+    try {
+      const response = await fetch(`http://localhost:3001/api/styling-templates/${template.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          isDefault: true
+        })
+      });
+
+      if (response.ok) {
+        toast.success('Template set as default!');
+        loadStylingTemplates(); // Reload to update the list
+      } else {
+        toast.error('Failed to set as default');
+      }
+    } catch (error) {
+      console.error('Error setting default template:', error);
+      toast.error('Failed to set as default');
     }
   };
 
@@ -196,6 +245,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
       visualStyle: briefData.visual_style,
       colorTheme: briefData.color_theme,
       logoUrl: briefData.logoUrl,
+      includeLogo: briefData.includeLogo,
       templateName: briefData.brand_name
     };
 
@@ -212,6 +262,25 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
         <Palette className="w-12 h-12 text-purple-500 mx-auto mb-3" />
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Brand Style Setup</h2>
         <p className="text-slate-600">Choose your brand and visual preferences for consistent storyboards</p>
+        
+        {/* Quick Start Button */}
+        {isAuthenticated && stylingTemplates.length > 0 && (
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const defaultTemplate = stylingTemplates.find(t => t.isDefault);
+                const templateToUse = defaultTemplate || stylingTemplates[0];
+                loadTemplate(templateToUse);
+                handleComplete();
+              }}
+              className="text-green-600 border-green-300 hover:bg-green-50"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Quick Start with {stylingTemplates.find(t => t.isDefault) ? 'Default' : 'Last'} Template
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Saved Templates Section */}
@@ -236,17 +305,37 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
                   onClick={() => loadTemplate(template)}
                 >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-slate-800">{template.name}</h3>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-slate-800">{template.name}</h3>
+                        {template.isDefault && (
+                          <Badge className="bg-green-100 text-green-800">Default</Badge>
+                        )}
+                      </div>
                       <div className="flex gap-2 mt-2">
                         <Badge variant="outline" className="capitalize">{template.visualStyle.replace('_', ' ')}</Badge>
                         <Badge variant="outline" className="capitalize">{template.colorTheme}</Badge>
                         {template.logoUrl && <Badge variant="outline">With Logo</Badge>}
                       </div>
                     </div>
-                    {template.logoUrl && (
-                      <img src={template.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
-                    )}
+                    <div className="flex items-center gap-2">
+                      {!template.isDefault && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAsDefault(template);
+                          }}
+                          className="text-xs"
+                        >
+                          Set Default
+                        </Button>
+                      )}
+                      {template.logoUrl && (
+                        <img src={template.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -377,6 +466,29 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
                   </div>
                 )}
               </div>
+              
+              {/* Logo Consent Checkbox */}
+              {briefData.logoUrl && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="include-logo"
+                      checked={briefData.includeLogo}
+                      onChange={(e) => setBriefData(prev => ({ ...prev, includeLogo: e.target.checked }))}
+                      className="mt-1"
+                    />
+                    <div>
+                      <label htmlFor="include-logo" className="text-sm font-medium text-blue-900 cursor-pointer">
+                        Include logo in generated images
+                      </label>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Your logo will be placed in the top-left corner of all generated storyboard images
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Description */}

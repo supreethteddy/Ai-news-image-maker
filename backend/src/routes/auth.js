@@ -1,9 +1,11 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { body, validationResult } from 'express-validator';
 import storage from '../storage/inMemoryStorage.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { supabase } from '../lib/supabase.js';
 
 const router = express.Router();
 
@@ -25,7 +27,59 @@ router.post('/register', [
 
     const { email, password, name } = req.body;
 
-    // Check if user already exists
+    // Try Supabase first - use proper authentication with email confirmation
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Supabase signup error:', error);
+        throw error;
+      }
+
+      if (data.user) {
+        // Create user profile in our custom table
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert([{
+            id: data.user.id,
+            email: data.user.email,
+            name: name,
+            role: 'user'
+          }]);
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          // Continue even if profile creation fails
+        }
+
+        return res.status(201).json({
+          success: true,
+          data: {
+            user: {
+              id: data.user.id,
+              email: data.user.email,
+              name: name,
+              role: 'user',
+              created_at: data.user.created_at,
+              email_confirmed: data.user.email_confirmed_at ? true : false
+            }
+          },
+          message: 'User registered successfully. Please check your email for confirmation.'
+        });
+      }
+    } catch (supabaseError) {
+      console.error('Supabase registration failed, falling back to in-memory storage:', supabaseError.message);
+    }
+
+    // Fallback to in-memory storage
     const existingUser = storage.getUserByEmail(email);
     if (existingUser) {
       return res.status(409).json({
@@ -68,7 +122,7 @@ router.post('/register', [
         user: userWithoutPassword,
         token
       },
-      message: 'User registered successfully'
+      message: 'User registered successfully (fallback mode)'
     });
   } catch (error) {
     console.error('Error registering user:', error);
@@ -96,7 +150,69 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
-    // Find user by email
+    // Try Supabase first - use proper authentication
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        console.error('Supabase login error:', error);
+        if (error.message.includes('email_not_confirmed')) {
+          return res.status(401).json({
+            success: false,
+            message: 'Please check your email and click the confirmation link before logging in.'
+          });
+        }
+        throw error;
+      }
+
+      if (data.user && data.session) {
+        // Get user profile
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Profile fetch error:', profileError);
+        }
+
+        // Generate a JWT token for the session
+        const token = jwt.sign(
+          { 
+            userId: data.user.id, 
+            email: data.user.email, 
+            name: profile?.name || data.user.user_metadata?.name || 'User',
+            role: profile?.role || 'user'
+          },
+          process.env.JWT_SECRET || 'fallback-secret',
+          { expiresIn: '7d' }
+        );
+
+        return res.json({
+          success: true,
+          data: {
+            user: {
+              id: data.user.id,
+              email: data.user.email,
+              name: profile?.name || data.user.user_metadata?.name || 'User',
+              role: profile?.role || 'user',
+              created_at: data.user.created_at,
+              email_confirmed: data.user.email_confirmed_at ? true : false
+            },
+            token: token
+          },
+          message: 'Login successful with Supabase'
+        });
+      }
+    } catch (supabaseError) {
+      console.error('Supabase login failed, falling back to in-memory storage:', supabaseError.message);
+    }
+
+    // Fallback to in-memory storage
     const user = storage.getUserByEmail(email);
     if (!user) {
       return res.status(401).json({
@@ -134,7 +250,7 @@ router.post('/login', [
         user: userWithoutPassword,
         token
       },
-      message: 'Login successful'
+      message: 'Login successful (fallback mode)'
     });
   } catch (error) {
     console.error('Error logging in user:', error);

@@ -13,7 +13,7 @@ import { toast } from "sonner";
 export default function MyStoryboards() {
   const [storyboards, setStoryboards] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated, token } = useAuth();
+  const { isAuthenticated, token, user } = useAuth();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -108,6 +108,11 @@ export default function MyStoryboards() {
               <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/63d7a612c_POWEREDBYSTAIBLTECHLogo.png" alt="NewsPlay Studio" className="w-8 md:w-10 h-8 md:h-10" />
               <span className="leading-tight">NewsPlay Studio</span>
             </h1>
+            {user && user.name && (
+              <p className="text-lg md:text-xl font-semibold text-slate-700 mb-2">
+                Welcome back, <span className="text-purple-600">{user.name}</span>! 👋
+              </p>
+            )}
             <p className="text-slate-600 text-base md:text-lg leading-relaxed">
               Manage your AI-powered visual stories, crafted with NewsPlay
             </p>
@@ -195,11 +200,11 @@ export default function MyStoryboards() {
                   <Card className="card-gradient border-slate-200/60 shadow-lg hover:shadow-2xl transition-all duration-300 h-full flex flex-col overflow-hidden group">
                     {/* Cover Image */}
                     <div className="relative h-40 md:h-48 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
-                      {storyboard.storyboardParts &&
-                  storyboard.storyboardParts.length > 0 &&
-                  storyboard.storyboardParts[0].imageUrl ?
+                      {storyboard.storyboard_parts &&
+                  storyboard.storyboard_parts.length > 0 &&
+                  storyboard.storyboard_parts[0].image_url ?
                   <img
-                    src={storyboard.storyboardParts[0].imageUrl}
+                    src={storyboard.storyboard_parts[0].image_url}
                     alt="Story cover"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" /> :
 
@@ -234,9 +239,9 @@ export default function MyStoryboards() {
                     
                     <CardContent className="flex-grow flex flex-col justify-between p-3 md:p-4 pt-0">
                       {/* Preview Text */}
-                      {storyboard.storyboardParts && storyboard.storyboardParts.length > 0 &&
+                      {storyboard.storyboard_parts && storyboard.storyboard_parts.length > 0 &&
                   <p className="text-slate-600 text-xs md:text-sm line-clamp-3 leading-relaxed mb-3 md:mb-4">
-                          {storyboard.storyboardParts[0].text}
+                          {storyboard.storyboard_parts[0].text}
                         </p>
                   }
                       
@@ -245,11 +250,11 @@ export default function MyStoryboards() {
                         <div className="text-slate-500 my-5 text-xs flex items-center justify-between md:text-sm">
                           <div className="flex items-center gap-1">
                             <FileText className="w-3 md:w-4 h-3 md:h-4" />
-                            <span>{storyboard.storyboardParts?.length || 0} scenes</span>
+                            <span>{storyboard.storyboard_parts?.length || 0} scenes</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 md:w-4 h-3 md:h-4" />
-                            <span>{new Date(storyboard.createdAt).toLocaleDateString()}</span>
+                            <span>{new Date(storyboard.created_at).toLocaleDateString()}</span>
                           </div>
                         </div>
                         

@@ -2,30 +2,14 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth.js';
 import storage from '../storage/inMemoryStorage.js';
+import DatabaseService from '../services/databaseService.js';
 
 const router = express.Router();
 
-// Get all storyboards for authenticated user
-router.get('/', authenticateToken, async (req, res) => {
+// Legacy route for /stories/:id (for frontend compatibility)
+router.get('/stories/:id', authenticateToken, async (req, res) => {
   try {
-    const storyboards = storage.getStoryboardsByUser(req.user.userId);
-    res.json({
-      success: true,
-      data: storyboards
-    });
-  } catch (error) {
-    console.error('Error fetching storyboards:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch storyboards'
-    });
-  }
-});
-
-// Get a specific storyboard by ID
-router.get('/:id', authenticateToken, async (req, res) => {
-  try {
-    const storyboard = storage.getStoryboardById(req.params.id);
+    const storyboard = await DatabaseService.getStoryboardById(req.params.id);
     
     if (!storyboard) {
       return res.status(404).json({
@@ -35,7 +19,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     // Check if storyboard belongs to the authenticated user
-    if (storyboard.userId !== req.user.userId) {
+    if (storyboard.user_id !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -48,10 +32,119 @@ router.get('/:id', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching storyboard:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch storyboard'
+    // Fallback to in-memory storage
+    try {
+      const storyboard = storage.getStoryboardById(req.params.id);
+      
+      if (!storyboard) {
+        return res.status(404).json({
+          success: false,
+          message: 'Storyboard not found'
+        });
+      }
+
+      // Check if storyboard belongs to the authenticated user
+      if (storyboard.userId !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: storyboard
+      });
+    } catch (fallbackError) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch storyboard'
+      });
+    }
+  }
+});
+
+// Get all storyboards for authenticated user
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const storyboards = await DatabaseService.getStoryboardsByUser(req.user.userId);
+    res.json({
+      success: true,
+      data: storyboards
     });
+  } catch (error) {
+    console.error('Error fetching storyboards:', error);
+    // Fallback to in-memory storage
+    try {
+      const storyboards = storage.getStoryboardsByUser(req.user.userId);
+      res.json({
+        success: true,
+        data: storyboards
+      });
+    } catch (fallbackError) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch storyboards'
+      });
+    }
+  }
+});
+
+// Get a specific storyboard by ID
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    const storyboard = await DatabaseService.getStoryboardById(req.params.id);
+    
+    if (!storyboard) {
+      return res.status(404).json({
+        success: false,
+        message: 'Storyboard not found'
+      });
+    }
+
+    // Check if storyboard belongs to the authenticated user
+    if (storyboard.user_id !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: storyboard
+    });
+  } catch (error) {
+    console.error('Error fetching storyboard:', error);
+    // Fallback to in-memory storage
+    try {
+      const storyboard = storage.getStoryboardById(req.params.id);
+      
+      if (!storyboard) {
+        return res.status(404).json({
+          success: false,
+          message: 'Storyboard not found'
+        });
+      }
+
+      // Check if storyboard belongs to the authenticated user
+      if (storyboard.userId !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: storyboard
+      });
+    } catch (fallbackError) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch storyboard'
+      });
+    }
   }
 });
 
@@ -77,16 +170,16 @@ router.post('/', authenticateToken, [
 
     const storyboardData = {
       title,
-      originalText,
-      storyboardParts,
-      characterId,
+      original_text: originalText,
+      storyboard_parts: storyboardParts,
+      character_id: characterId,
       style: style || 'realistic',
-      userId: req.user.userId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      user_id: req.user.userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
-    const storyboard = storage.createStoryboard(storyboardData);
+    const storyboard = await DatabaseService.createStoryboard(storyboardData);
 
     res.status(201).json({
       success: true,
@@ -95,10 +188,32 @@ router.post('/', authenticateToken, [
     });
   } catch (error) {
     console.error('Error creating storyboard:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create storyboard'
-    });
+    // Fallback to in-memory storage
+    try {
+      const fallbackData = {
+        title,
+        originalText,
+        storyboardParts,
+        characterId,
+        style: style || 'realistic',
+        userId: req.user.userId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      const storyboard = storage.createStoryboard(fallbackData);
+      
+      res.status(201).json({
+        success: true,
+        data: storyboard,
+        message: 'Storyboard saved successfully (fallback)'
+      });
+    } catch (fallbackError) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create storyboard'
+      });
+    }
   }
 });
 

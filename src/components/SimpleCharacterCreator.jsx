@@ -98,6 +98,9 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
     try {
       const response = await fetch('http://localhost:3001/api/upload/character-image', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: uploadFormData
       });
 
@@ -105,11 +108,13 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
         const data = await response.json();
         return data.data.imageUrl;
       } else {
-        throw new Error('Upload failed');
+        const errorData = await response.json();
+        console.error('Upload failed:', errorData);
+        throw new Error(errorData.message || 'Upload failed');
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
+      toast.error('Failed to upload image: ' + error.message);
       return null;
     }
   };

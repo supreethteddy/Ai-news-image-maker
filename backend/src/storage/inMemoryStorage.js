@@ -5,6 +5,8 @@ class InMemoryStorage {
     this.brandProfiles = new Map();
     this.users = new Map();
     this.characters = new Map();
+    this.storyboards = new Map();
+    this.stylingTemplates = new Map();
     this.nextId = 1;
   }
 
@@ -184,12 +186,94 @@ class InMemoryStorage {
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
+  // Storyboard operations
+  createStoryboard(data) {
+    const id = `storyboard_${this.nextId++}`;
+    const storyboard = {
+      id,
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    this.storyboards.set(id, storyboard);
+    return storyboard;
+  }
+
+  getStoryboardById(id) {
+    return this.storyboards.get(id);
+  }
+
+  updateStoryboard(id, data) {
+    const storyboard = this.storyboards.get(id);
+    if (!storyboard) return null;
+    
+    const updatedStoryboard = {
+      ...storyboard,
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+    this.storyboards.set(id, updatedStoryboard);
+    return updatedStoryboard;
+  }
+
+  deleteStoryboard(id) {
+    return this.storyboards.delete(id);
+  }
+
+  getStoryboardsByUser(userId) {
+    return Array.from(this.storyboards.values())
+      .filter(storyboard => storyboard.userId === userId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  // Styling Template operations
+  createStylingTemplate(data) {
+    const id = `template_${this.nextId++}`;
+    const template = {
+      id,
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    this.stylingTemplates.set(id, template);
+    return template;
+  }
+
+  getStylingTemplateById(id) {
+    return this.stylingTemplates.get(id);
+  }
+
+  updateStylingTemplate(id, data) {
+    const template = this.stylingTemplates.get(id);
+    if (!template) return null;
+    
+    const updatedTemplate = {
+      ...template,
+      ...data,
+      updatedAt: new Date().toISOString()
+    };
+    this.stylingTemplates.set(id, updatedTemplate);
+    return updatedTemplate;
+  }
+
+  deleteStylingTemplate(id) {
+    return this.stylingTemplates.delete(id);
+  }
+
+  getStylingTemplatesByUser(userId) {
+    return Array.from(this.stylingTemplates.values())
+      .filter(template => template.userId === userId)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
   // Utility methods
   clear() {
     this.stories.clear();
     this.brandProfiles.clear();
     this.users.clear();
     this.characters.clear();
+    this.storyboards.clear();
+    this.stylingTemplates.clear();
     this.nextId = 1;
   }
 
@@ -198,7 +282,9 @@ class InMemoryStorage {
       stories: this.stories.size,
       brandProfiles: this.brandProfiles.size,
       users: this.users.size,
-      characters: this.characters.size
+      characters: this.characters.size,
+      storyboards: this.storyboards.size,
+      stylingTemplates: this.stylingTemplates.size
     };
   }
 }

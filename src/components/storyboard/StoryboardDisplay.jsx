@@ -6,14 +6,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, BookOpenText, RefreshCw, Sparkles, Pencil, Check, X, Image } from "lucide-react";
+import { Loader2, BookOpenText, RefreshCw, Sparkles, Pencil, Check, X, Image, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { runwareImageGeneration } from "@/api/functions"; // Updated import
 import { InvokeLLM } from "@/api/integrations";
 import { Story } from "@/api/entities";
 import { VISUAL_STYLES, COLOR_THEMES } from "../creation/StyleSelector";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardUpdate }) {
+  const { isAuthenticated, token } = useAuth();
   const [regeneratingIndex, setRegeneratingIndex] = useState(null);
   const [regeneratingText, setRegeneratingText] = useState(null);
   const [editingTextIndex, setEditingTextIndex] = useState(null);
@@ -294,6 +296,53 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
     regenerateImage(partIndex, editedPromptContent);
   };
 
+  // Download image function
+  const handleDownloadImage = async (partIndex) => {
+    if (!storyboard || !storyboard.storyboard_parts[partIndex] || !storyboard.storyboard_parts[partIndex].image_url) {
+      return;
+    }
+
+    const imageUrl = storyboard.storyboard_parts[partIndex].image_url;
+    
+    try {
+      // If authenticated, use backend proxy for download
+      if (isAuthenticated && token && storyboard.id && !storyboard.id.startsWith('local_')) {
+        const response = await fetch(`http://localhost:3001/api/storyboards/${storyboard.id}/images/${partIndex}/download`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${storyboard.title || 'storyboard'}-scene-${partIndex + 1}.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } else {
+          throw new Error('Download failed');
+        }
+      } else {
+        // Fallback: direct download (may have CORS issues)
+        const a = document.createElement('a');
+        a.href = imageUrl;
+        a.download = `${storyboard.title || 'storyboard'}-scene-${partIndex + 1}.jpg`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      // Fallback to opening in new tab
+      window.open(imageUrl, '_blank');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-8 md:py-12 px-4">
@@ -469,6 +518,16 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
                           >
                             <RefreshCw className="w-3 md:w-4 h-3 md:h-4 mr-1" />
                             Regenerate Image
+                          </Button>
+                          
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleDownloadImage(index)}
+                            className="bg-white text-slate-900 border border-green-600 shadow-md hover:shadow-lg hover:bg-green-50 transition-all duration-300 text-xs md:text-sm px-2 md:px-3 py-1 md:py-2 min-h-[36px] touch-manipulation"
+                          >
+                            <Download className="w-3 md:w-4 h-3 md:h-4 mr-1" />
+                            Download
                           </Button>
                           
                           <Popover open={editingPromptIndex === index} onOpenChange={(open) => setEditingPromptIndex(open ? index : null)}>

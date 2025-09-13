@@ -6,9 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Palette, Save, Check, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Palette, Save, Check, Loader2, Upload, Image, Trash2, FolderOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import StyleSelector from "./StyleSelector";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
   const [step, setStep] = useState(1);
@@ -16,16 +19,27 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
   const [selectedBrandProfile, setSelectedBrandProfile] = useState(null);
   const [isCreatingNewProfile, setIsCreatingNewProfile] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [stylingTemplates, setStylingTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const { isAuthenticated, token } = useAuth();
   
   const [briefData, setBriefData] = useState({
     brand_name: "",
     visual_style: "realistic",
-    color_theme: "modern"
+    color_theme: "modern",
+    logoUrl: null,
+    description: ""
   });
 
   useEffect(() => {
     loadBrandProfiles();
-  }, []);
+    if (isAuthenticated) {
+      loadStylingTemplates();
+    }
+  }, [isAuthenticated, token]);
 
   const loadBrandProfiles = async () => {
     try {
@@ -39,6 +53,110 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
       }
     } catch (error) {
       console.error("Error loading brand profiles:", error);
+    }
+  };
+
+  const loadStylingTemplates = async () => {
+    if (!isAuthenticated || !token) return;
+
+    try {
+      const response = await fetch('http://localhost:3001/api/styling-templates', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStylingTemplates(data.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading styling templates:", error);
+    }
+  };
+
+  const handleLogoUpload = async (file) => {
+    if (!file) return;
+
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch('http://localhost:3001/api/upload/character-image', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBriefData(prev => ({ ...prev, logoUrl: data.data.url }));
+        setLogoPreview(URL.createObjectURL(file));
+        toast.success('Logo uploaded successfully!');
+      } else {
+        toast.error('Failed to upload logo');
+      }
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast.error('Failed to upload logo');
+    }
+    setUploadingLogo(false);
+  };
+
+  const saveStylingTemplate = async () => {
+    if (!isAuthenticated || !token) {
+      toast.error('Please log in to save templates');
+      return;
+    }
+
+    if (!briefData.brand_name.trim()) {
+      toast.error('Please enter a template name');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/styling-templates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: briefData.brand_name,
+          visualStyle: briefData.visual_style,
+          colorTheme: briefData.color_theme,
+          logoUrl: briefData.logoUrl,
+          description: briefData.description
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStylingTemplates(prev => [data.data, ...prev]);
+        toast.success('Template saved successfully!');
+      } else {
+        toast.error('Failed to save template');
+      }
+    } catch (error) {
+      console.error('Error saving template:', error);
+      toast.error('Failed to save template');
+    }
+    setSaving(false);
+  };
+
+  const loadTemplate = (template) => {
+    setSelectedTemplate(template);
+    setBriefData(prev => ({
+      ...prev,
+      brand_name: template.name,
+      visual_style: template.visualStyle,
+      color_theme: template.colorTheme,
+      logoUrl: template.logoUrl,
+      description: template.description
+    }));
+    if (template.logoUrl) {
+      setLogoPreview(template.logoUrl);
     }
   };
 
@@ -76,7 +194,9 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
     const finalData = {
       brandProfile: selectedBrandProfile,
       visualStyle: briefData.visual_style,
-      colorTheme: briefData.color_theme
+      colorTheme: briefData.color_theme,
+      logoUrl: briefData.logoUrl,
+      templateName: briefData.brand_name
     };
 
     onComplete(finalData);
@@ -93,6 +213,47 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Brand Style Setup</h2>
         <p className="text-slate-600">Choose your brand and visual preferences for consistent storyboards</p>
       </div>
+
+      {/* Saved Templates Section */}
+      {isAuthenticated && stylingTemplates.length > 0 && (
+        <Card className="border-blue-200">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FolderOpen className="w-5 h-5" />
+              Load Saved Template
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3">
+              {stylingTemplates.map((template) => (
+                <div
+                  key={template.id}
+                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                    selectedTemplate?.id === template.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-slate-200 hover:border-blue-300'
+                  }`}
+                  onClick={() => loadTemplate(template)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-slate-800">{template.name}</h3>
+                      <div className="flex gap-2 mt-2">
+                        <Badge variant="outline" className="capitalize">{template.visualStyle.replace('_', ' ')}</Badge>
+                        <Badge variant="outline" className="capitalize">{template.colorTheme}</Badge>
+                        {template.logoUrl && <Badge variant="outline">With Logo</Badge>}
+                      </div>
+                    </div>
+                    {template.logoUrl && (
+                      <img src={template.logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {brandProfiles.length > 0 && !isCreatingNewProfile && (
         <Card className="border-purple-200">
@@ -164,6 +325,72 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
               </div>
                <p className="text-xs text-slate-500 mt-2">Save this brand to reuse its style settings in the future.</p>
             </div>
+
+            {/* Logo Upload Section */}
+            <div>
+              <Label>Company Logo (Optional)</Label>
+              <div className="mt-2">
+                {logoPreview ? (
+                  <div className="flex items-center gap-4 p-4 border rounded-lg">
+                    <img src={logoPreview} alt="Logo preview" className="w-16 h-16 object-contain rounded" />
+                    <div className="flex-1">
+                      <p className="text-sm text-slate-600">Logo uploaded successfully</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setLogoPreview(null);
+                          setBriefData(prev => ({ ...prev, logoUrl: null }));
+                        }}
+                        className="mt-2"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove Logo
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          handleLogoUpload(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="logo-upload"
+                    />
+                    <label htmlFor="logo-upload" className="cursor-pointer">
+                      <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                      <p className="text-sm text-slate-600 mb-2">Upload your company logo</p>
+                      <p className="text-xs text-slate-500">PNG, JPG up to 5MB</p>
+                    </label>
+                  </div>
+                )}
+                {uploadingLogo && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm text-slate-600">Uploading logo...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                value={briefData.description || ''}
+                onChange={(e) => setBriefData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Brief description of your brand or project..."
+                className="mt-2"
+                rows={3}
+              />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -186,6 +413,31 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
         selectedStyle={briefData.visual_style}
         selectedColorTheme={briefData.color_theme}
       />
+
+      {/* Save Template Section */}
+      {isAuthenticated && (
+        <Card className="border-green-200">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Save className="w-5 h-5" />
+              Save as Template
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-600 mb-4">
+              Save this styling configuration as a template to reuse in future storyboards.
+            </p>
+            <Button
+              onClick={saveStylingTemplate}
+              disabled={!briefData.brand_name || !briefData.brand_name.trim() || saving}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+              Save Template
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </motion.div>
   );
 

@@ -14,6 +14,7 @@ import SimplifiedCreativeBrief from "../components/creation/SimplifiedCreativeBr
 import { VISUAL_STYLES, COLOR_THEMES } from "../components/creation/StyleSelector";
 import CharacterSelector from "../components/CharacterSelector";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function CreateStoryboard() {
   const [originalText, setOriginalText] = useState("");
@@ -23,7 +24,7 @@ export default function CreateStoryboard() {
   const [showCreativeBrief, setShowCreativeBrief] = useState(false);
   const [creativeBriefData, setCreativeBriefData] = useState(null);
   const [selectedCharacter, setSelectedCharacter] = useState(null);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
 
   // Character consistency helper
   const extractCharacterReference = (characterPersona) => {
@@ -70,7 +71,7 @@ export default function CreateStoryboard() {
   };
 
   // Smart prompt builder with FIXED length management
-  const buildOptimizedPrompt = (scenePrompt, characterRef, visualStyle, colorTheme) => {
+  const buildOptimizedPrompt = (scenePrompt, characterRef, visualStyle, colorTheme, logoUrl = null) => {
     const MAX_PROMPT_LENGTH = 300; // Reduced to be more conservative
     
     // Ensure all inputs are safe strings
@@ -89,6 +90,9 @@ export default function CreateStoryboard() {
 
     const styleModifier = (styleData?.prompt || "high quality, detailed").substring(0, 50);
     const colorModifier = (colorData?.prompt || "balanced colors").substring(0, 50);
+    
+    // Add logo context if available
+    const logoContext = logoUrl ? " featuring company branding and logo" : "";
 
     // Build prompt more carefully
     let prompt = safeScenePrompt;
@@ -112,8 +116,8 @@ export default function CreateStoryboard() {
 
     // Add modifiers if there's room
     const remainingSpace = MAX_PROMPT_LENGTH - prompt.length - 10; // Leave buffer
-    if (remainingSpace > colorModifier.length + styleModifier.length + 10) {
-      prompt += `. ${colorModifier}. ${styleModifier}`;
+    if (remainingSpace > colorModifier.length + styleModifier.length + logoContext.length + 10) {
+      prompt += `. ${colorModifier}. ${styleModifier}${logoContext}`;
     } else if (remainingSpace > 20) { // If not enough for both, but some space
       prompt += ". High quality, detailed";
     }
@@ -124,6 +128,50 @@ export default function CreateStoryboard() {
   const handleCreativeBriefComplete = (briefData) => {
     setCreativeBriefData(briefData);
     setShowCreativeBrief(false);
+  };
+
+  // Save storyboard to backend
+  const saveStoryboardToBackend = async (storyboardData) => {
+    if (!isAuthenticated || !token) {
+      console.log('Not authenticated, skipping backend save');
+      return null;
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/api/storyboards', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: storyboardData.title,
+          originalText: storyboardData.original_text,
+          storyboardParts: storyboardData.storyboard_parts.map(part => ({
+            text: part.text,
+            imagePrompt: part.image_prompt,
+            sectionTitle: part.section_title,
+            imageUrl: part.image_url
+          })),
+          characterId: selectedCharacter?.id,
+          style: creativeBriefData?.visualStyle || 'realistic'
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success('Storyboard saved successfully!');
+        return data.data;
+      } else {
+        console.error('Failed to save storyboard:', await response.text());
+        toast.error('Failed to save storyboard');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error saving storyboard:', error);
+      toast.error('Failed to save storyboard');
+      return null;
+    }
   };
 
   const handleSubmit = async () => {
@@ -241,7 +289,8 @@ export default function CreateStoryboard() {
             updatedParts[i].image_prompt,
             characterRef,
             creativeBriefData?.visualStyle || "realistic",
-            creativeBriefData?.colorTheme || "modern"
+            creativeBriefData?.colorTheme || "modern",
+            creativeBriefData?.logoUrl
           );
 
           console.log(`Optimized prompt: ${optimizedPrompt}`);
@@ -298,7 +347,7 @@ export default function CreateStoryboard() {
         }
       }
 
-      // Mark as completed
+      // Mark as completed and save to backend
       if (createdStory?.id) {
         const finalStoryboard = {
           ...createdStory,
@@ -311,6 +360,9 @@ export default function CreateStoryboard() {
           }))
         };
         setCurrentStoryboard(finalStoryboard);
+        
+        // Save to backend storyboards API
+        await saveStoryboardToBackend(finalStoryboard);
         
         // Only update database if authenticated
         if (!createdStory.id.startsWith('local_')) {

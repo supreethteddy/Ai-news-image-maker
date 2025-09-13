@@ -1,31 +1,87 @@
 
 import React, { useState, useEffect } from "react";
-import { Story } from "@/api/entities";
 import { createPageUrl } from "@/utils";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Calendar, FileText, Loader2, BookOpenText } from "lucide-react";
+import { Eye, Calendar, FileText, Loader2, BookOpenText, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 export default function MyStoryboards() {
   const [storyboards, setStoryboards] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated, token } = useAuth();
 
   useEffect(() => {
-    loadStoryboards();
-  }, []);
+    if (isAuthenticated) {
+      loadStoryboards();
+    } else {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, token]);
 
   const loadStoryboards = async () => {
+    if (!isAuthenticated || !token) {
+      setStoryboards([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const data = await Story.list("-created_date");
-      setStoryboards(data);
+      const response = await fetch('http://localhost:3001/api/storyboards', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStoryboards(data.data || []);
+      } else if (response.status === 401) {
+        toast.error('Please log in to view your storyboards');
+        setStoryboards([]);
+      } else {
+        toast.error('Failed to fetch storyboards');
+      }
     } catch (error) {
       console.error("Error loading storyboards:", error);
+      toast.error('Failed to fetch storyboards');
     }
     setIsLoading(false);
+  };
+
+  const handleDeleteStoryboard = async (storyboardId) => {
+    if (!isAuthenticated || !token) {
+      toast.error('Please log in to delete storyboards');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this storyboard?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/storyboards/${storyboardId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success('Storyboard deleted successfully');
+        loadStoryboards(); // Reload the list
+      } else {
+        toast.error('Failed to delete storyboard');
+      }
+    } catch (error) {
+      console.error('Error deleting storyboard:', error);
+      toast.error('Failed to delete storyboard');
+    }
   };
 
   const getStatusColor = (status) => {
@@ -72,6 +128,31 @@ export default function MyStoryboards() {
               <p className="text-slate-600 text-base md:text-lg">Loading your stories...</p>
             </div>
           </div> :
+        !isAuthenticated ? (
+        /* Not Authenticated State */
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center py-16 md:py-20 px-4">
+          <div className="max-w-md mx-auto">
+            <div className="w-20 md:w-24 h-20 md:h-24 bg-gradient-to-r from-purple-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
+              <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/85bd47c69_4.png" alt="Sign In" className="w-10 md:w-12 h-10 md:h-12" />
+            </div>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-700 mb-3 md:mb-4">
+              Sign in to view your storyboards
+            </h2>
+            <p className="text-slate-500 mb-6 md:mb-8 leading-relaxed text-sm md:text-base">
+              Please log in to access your saved visual stories and create new ones.
+            </p>
+            <Link to={createPageUrl("CreateStoryboard")}>
+              <Button className="bg-white text-slate-900 border border-blue-600 shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-300 text-base md:text-lg px-6 md:px-8 py-3 min-h-[48px] touch-manipulation">
+                <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/f145ce9d6_3.png" alt="Create" className="w-4 md:w-5 h-4 md:h-5 mr-2" />
+                Create Your First Story
+              </Button>
+            </Link>
+          </div>
+        </motion.div>) :
         storyboards.length === 0 ? (
         /* Empty State */
         <motion.div
@@ -114,37 +195,33 @@ export default function MyStoryboards() {
                   <Card className="card-gradient border-slate-200/60 shadow-lg hover:shadow-2xl transition-all duration-300 h-full flex flex-col overflow-hidden group">
                     {/* Cover Image */}
                     <div className="relative h-40 md:h-48 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
-                      {storyboard.storyboard_parts &&
-                  storyboard.storyboard_parts.length > 0 &&
-                  storyboard.storyboard_parts[0].image_url ?
+                      {storyboard.storyboardParts &&
+                  storyboard.storyboardParts.length > 0 &&
+                  storyboard.storyboardParts[0].imageUrl ?
                   <img
-                    src={storyboard.storyboard_parts[0].image_url}
+                    src={storyboard.storyboardParts[0].imageUrl}
                     alt="Story cover"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" /> :
 
 
                   <div className="w-full h-full flex items-center justify-center">
                           <div className="text-center">
-                            {storyboard.status === 'processing' ?
-                      <>
-                                <Loader2 className="w-6 md:w-8 h-6 md:h-8 text-purple-400 animate-spin mx-auto mb-2" />
-                                <p className="text-xs md:text-sm text-slate-500">Generating...</p>
-                              </> :
-
-                      <>
-                                <BookOpenText className="w-10 md:w-12 h-10 md:h-12 text-slate-400 mx-auto mb-2" />
-                                <p className="text-xs md:text-sm text-slate-500">No image available</p>
-                              </>
-                      }
+                            <BookOpenText className="w-10 md:w-12 h-10 md:h-12 text-slate-400 mx-auto mb-2" />
+                            <p className="text-xs md:text-sm text-slate-500">No image available</p>
                           </div>
                         </div>
                   }
                       
-                      {/* Status Badge */}
-                      <div className="absolute top-2 md:top-3 right-2 md:right-3">
-                        <Badge className={`${getStatusColor(storyboard.status)} border font-medium capitalize text-xs`}>
-                          {storyboard.status}
-                        </Badge>
+                      {/* Delete Button */}
+                      <div className="absolute top-2 md:top-3 left-2 md:left-3">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteStoryboard(storyboard.id)}
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                       </div>
                     </div>
 
@@ -157,9 +234,9 @@ export default function MyStoryboards() {
                     
                     <CardContent className="flex-grow flex flex-col justify-between p-3 md:p-4 pt-0">
                       {/* Preview Text */}
-                      {storyboard.storyboard_parts && storyboard.storyboard_parts.length > 0 &&
+                      {storyboard.storyboardParts && storyboard.storyboardParts.length > 0 &&
                   <p className="text-slate-600 text-xs md:text-sm line-clamp-3 leading-relaxed mb-3 md:mb-4">
-                          {storyboard.storyboard_parts[0].text}
+                          {storyboard.storyboardParts[0].text}
                         </p>
                   }
                       
@@ -168,11 +245,11 @@ export default function MyStoryboards() {
                         <div className="text-slate-500 my-5 text-xs flex items-center justify-between md:text-sm">
                           <div className="flex items-center gap-1">
                             <FileText className="w-3 md:w-4 h-3 md:h-4" />
-                            <span>{storyboard.storyboard_parts?.length || 0} chapters</span>
+                            <span>{storyboard.storyboardParts?.length || 0} scenes</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 md:w-4 h-3 md:h-4" />
-                            <span>{new Date(storyboard.created_date).toLocaleDateString()}</span>
+                            <span>{new Date(storyboard.createdAt).toLocaleDateString()}</span>
                           </div>
                         </div>
                         

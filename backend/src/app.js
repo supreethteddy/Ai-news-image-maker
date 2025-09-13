@@ -13,6 +13,8 @@ import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
 import characterRoutes from './routes/characters.js';
 import uploadRoutes from './routes/upload.js';
+import storyboardRoutes from './routes/storyboards.js';
+import stylingTemplateRoutes from './routes/stylingTemplates.js';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -70,6 +72,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/characters', characterRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/storyboards', storyboardRoutes);
+app.use('/api/styling-templates', stylingTemplateRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -83,7 +87,9 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       ai: '/api/ai',
       characters: '/api/characters',
-      upload: '/api/upload'
+      upload: '/api/upload',
+      storyboards: '/api/storyboards',
+      stylingTemplates: '/api/styling-templates'
     }
   });
 });

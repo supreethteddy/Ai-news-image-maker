@@ -15,7 +15,7 @@ export class GeminiService {
       const prompt = this.buildStoryboardPrompt(articleText, brandPreferences);
       
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
           contents: [{
             parts: [{
@@ -50,7 +50,7 @@ export class GeminiService {
       const prompt = this.buildEnhancementPrompt(originalPrompt, characterPersona, visualStyle, colorTheme);
       
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
           contents: [{
             parts: [{
@@ -211,6 +211,8 @@ export class IdeogramService {
         formData.append('prompt', prompt);
         formData.append('rendering_speed', 'TURBO');
         formData.append('num_images', '1');
+        formData.append('aspect_ratio', options?.aspect_ratio || '16x9');
+        formData.append('magic_prompt', options?.magic_prompt === true ? 'ON' : 'OFF');
         // Character reference supports a limited set; fallback if unsupported
         const crAllowed = new Set(['AUTO', 'REALISTIC', 'FICTION']);
         formData.append('style_type', crAllowed.has(styleType) ? styleType : 'REALISTIC');
@@ -218,6 +220,10 @@ export class IdeogramService {
         const presetKey = stylePresetMap[styleType];
         if (presetKey) {
           formData.append('style_preset', presetKey);
+        }
+        // Add color theme if provided
+        if (options?.color_theme) {
+          formData.append('color_theme', String(options.color_theme).toUpperCase());
         }
 
         // Load first reference image (Ideogram supports one or multiple; we pass all provided)
@@ -339,11 +345,11 @@ export class IdeogramService {
         rendering_speed: 'TURBO',
         num_images: 1,
         style_type: styleType,
+        aspect_ratio: options?.aspect_ratio || '16x9', // Fixed: Default to correct format
         ...(stylePresetMap[styleType] ? { style_preset: stylePresetMap[styleType] } : {}),
         ...(options?.color_theme ? { color_theme: String(options.color_theme).toUpperCase() } : {}),
-        ...(options?.aspect_ratio ? { aspect_ratio: options.aspect_ratio } : {}),
         // Reduce magic prompt impact to avoid overriding style
-        ...(typeof options?.magic_prompt === 'boolean' ? { magic_prompt: options.magic_prompt } : { magic_prompt: false })
+        magic_prompt: options?.magic_prompt === true ? 'ON' : 'OFF'
       }, {
         headers: {
           'Api-Key': process.env.IDEOGRAM_API_KEY,
@@ -434,16 +440,15 @@ export class IdeogramService {
     } catch (error) {
       console.error('Ideogram API Error:', error);
       
-      // Always return a fallback image for faster demo experience
-      console.log('Using fallback image for faster demo experience');
+      // Return error instead of random fallback to identify real issues
       return {
-        success: true,
-        url: `https://picsum.photos/1024/576?random=${Math.floor(Math.random() * 1000)}`,
+        success: false,
+        error: error.message,
+        url: null,
         metadata: {
           prompt: prompt,
-          model: 'fallback',
-          dimensions: '16:9',
-          note: 'Fast fallback image for demo'
+          model: 'ideogram-v3',
+          error: 'Image generation failed'
         }
       };
     }

@@ -400,9 +400,10 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
         )}
       </div>
 
-      {storyboard.storyboard_parts.map((part, index) => (
-        <AnimatePresence key={index}>
+      <AnimatePresence>
+        {storyboard.storyboard_parts.map((part, index) => (
           <motion.div
+            key={`part-${index}-${part.section_title || index}`}
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
@@ -589,19 +590,18 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-
-          {index < storyboard.storyboard_parts.length - 1 && (
-            <div className="flex justify-center my-6 md:my-8">
-              <div className="flex items-center gap-2 md:gap-3">
-                <Separator className="w-12 md:w-16 bg-gradient-to-r from-purple-300 to-blue-300 h-0.5" />
-                <div className="w-2 md:w-3 h-2 md:h-3 bg-gradient-to-r from-purple-500 to-blue-600 rounded-full"></div>
-                <Separator className="w-12 md:w-16 bg-gradient-to-r from-blue-300 to-purple-300 h-0.5" />
+            {index < storyboard.storyboard_parts.length - 1 && (
+              <div className="flex justify-center my-6 md:my-8">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <Separator className="w-12 md:w-16 bg-gradient-to-r from-purple-300 to-blue-300 h-0.5" />
+                  <div className="w-2 md:w-3 h-2 md:h-3 bg-gradient-to-r from-purple-500 to-blue-600 rounded-full"></div>
+                  <Separator className="w-12 md:w-16 bg-gradient-to-r from-blue-300 to-purple-300 h-0.5" />
+                </div>
               </div>
-            </div>
-          )}
-        </AnimatePresence>
-      ))}
+            )}
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
       <div className="text-center pt-8 md:pt-12 pb-6 md:pb-8">
         <div className="w-12 md:w-16 h-0.5 md:h-1 bg-gradient-to-r from-purple-500 to-blue-600 mx-auto rounded-full mb-3 md:mb-4"></div>

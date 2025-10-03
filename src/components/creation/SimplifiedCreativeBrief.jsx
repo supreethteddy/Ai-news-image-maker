@@ -146,7 +146,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
           name: briefData.brand_name,
           visualStyle: briefData.visual_style,
           colorTheme: briefData.color_theme,
-          logoUrl: briefData.logoUrl,
+          logoUrl: briefData.logoUrl || undefined,
           includeLogo: briefData.includeLogo,
           description: briefData.description
         })

@@ -16,13 +16,13 @@ const styleToPreset = (styleKey) => {
 export const runwareImageGeneration = async (params) => {
   try {
     // Enhanced options for Ideogram API
-    const selectedStyle = (params?.visualStyle || params?.options?.style_type || params?.options?.style || 'GENERAL');
-    const selectedTheme = (params?.colorTheme || params?.options?.color_theme || null);
+    const selectedStyle = (params?.visualStyle || params?.options?.visualStyle || params?.options?.style_type || params?.options?.style || 'GENERAL');
+    const selectedTheme = (params?.colorTheme || params?.options?.colorTheme || params?.options?.color_theme || null);
     const options = {
-      aspect_ratio: '16:9',
+      aspect_ratio: '16x9', // Fixed: Use 'x' instead of ':' for Ideogram API
       style_type: selectedStyle,
       // Turn off magic prompt when a specific style is chosen to avoid overrides
-      magic_prompt: (selectedStyle?.toString?.().toUpperCase?.() === 'GENERAL'),
+      magic_prompt: (selectedStyle?.toString?.().toUpperCase?.() === 'GENERAL') ? 'ON' : 'OFF',
       // Prefer style_preset when available for stronger aesthetics
       ...(styleToPreset(selectedStyle) ? { style_preset: styleToPreset(selectedStyle) } : {}),
       ...(selectedTheme ? { color_theme: selectedTheme } : {}),
@@ -46,17 +46,14 @@ export const runwareImageGeneration = async (params) => {
   } catch (error) {
     console.error('Ideogram image generation error:', error);
     
-    // Fallback for development
-    if (import.meta.env.DEV) {
-      return {
-        data: {
-          url: `https://picsum.photos/1024/576?random=${Math.floor(Math.random() * 1000)}`
-        },
-        success: true
-      };
-    }
-    
-    throw error;
+    // Return error instead of random fallback
+    return {
+      data: {
+        url: null
+      },
+      success: false,
+      error: error.message
+    };
   }
 };
 

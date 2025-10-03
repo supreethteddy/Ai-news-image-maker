@@ -72,7 +72,7 @@ export default function CreateStoryboard() {
 
   // Smart prompt builder with FIXED length management
   const buildOptimizedPrompt = (scenePrompt, characterRef, visualStyle, colorTheme, logoUrl = null, includeLogo = false) => {
-    const MAX_PROMPT_LENGTH = 300; // Reduced to be more conservative
+    const MAX_PROMPT_LENGTH = 400; // Increased for better context
     
     // Ensure all inputs are safe strings
     const safeScenePrompt = String(scenePrompt || "").trim();
@@ -88,42 +88,40 @@ export default function CreateStoryboard() {
     const styleData = VISUAL_STYLES.find(s => s.key === safeVisualStyle) || VISUAL_STYLES[0];
     const colorData = COLOR_THEMES.find(c => c.key === safeColorTheme) || COLOR_THEMES[0];
 
-    const styleModifier = (styleData?.prompt || "high quality, detailed").substring(0, 50);
-    const colorModifier = (colorData?.prompt || "balanced colors").substring(0, 50);
+    const styleModifier = (styleData?.prompt || "high quality, detailed");
+    const colorModifier = (colorData?.prompt || "balanced colors");
     
     // Add logo context if available and user wants it included
     const logoContext = (logoUrl && includeLogo) ? " with company logo in top-left corner" : "";
 
-    // Build prompt more carefully
+    // Build prompt with better structure for context
     let prompt = safeScenePrompt;
     
-    // Truncate main scene description to leave room for modifiers
-    if (prompt.length > 180) {
-      prompt = prompt.substring(0, 180);
+    // Ensure we have enough room for all modifiers
+    const availableLength = MAX_PROMPT_LENGTH - 100; // Reserve space for modifiers
+    if (prompt.length > availableLength) {
+      prompt = prompt.substring(0, availableLength);
       // Try to end at a word boundary
       const lastSpace = prompt.lastIndexOf(' ');
-      if (lastSpace > 150) { // Ensure we don't cut too much off if no space found late
+      if (lastSpace > availableLength - 50) {
         prompt = prompt.substring(0, lastSpace);
       }
     }
 
-    // Add character reference if short enough
-    // Check total potential length before adding
-    if (safeCharacterRef && (prompt.length + safeCharacterRef.length + 50) < MAX_PROMPT_LENGTH) {
-      const shortCharRef = safeCharacterRef.substring(0, 40);
-      prompt += `. ${shortCharRef}`;
+    // Add character reference for consistency
+    if (safeCharacterRef && prompt.length + safeCharacterRef.length + 100 < MAX_PROMPT_LENGTH) {
+      const shortCharRef = safeCharacterRef.substring(0, 60);
+      prompt += `. Character: ${shortCharRef}`;
     }
 
-    // Always include concise style and color cues so API honors selection
-    const condensedStyle = styleModifier.split(',').slice(0, 2).join(', ');
-    const condensedColor = colorModifier.split(',').slice(0, 2).join(', ');
-    prompt += `. ${condensedColor}. ${condensedStyle}${logoContext}`;
+    // Add style and color with better formatting
+    prompt += `. Style: ${styleModifier}. Colors: ${colorModifier}${logoContext}`;
 
     // Final length guard
     if (prompt.length > MAX_PROMPT_LENGTH) {
-      prompt = `${prompt.substring(0, MAX_PROMPT_LENGTH - 1)}`;
+      prompt = prompt.substring(0, MAX_PROMPT_LENGTH - 10);
       const cut = prompt.lastIndexOf(' ');
-      if (cut > MAX_PROMPT_LENGTH - 60) {
+      if (cut > MAX_PROMPT_LENGTH - 50) {
         prompt = prompt.substring(0, cut);
       }
     }
@@ -152,15 +150,15 @@ export default function CreateStoryboard() {
         },
         body: JSON.stringify({
           title: storyboardData.title,
-          originalText: storyboardData.original_text,
-          storyboardParts: storyboardData.storyboard_parts.map(part => ({
+          original_text: storyboardData.original_text, // Fixed: Use snake_case
+          storyboard_parts: storyboardData.storyboard_parts.map(part => ({
             text: part.text,
-            imagePrompt: part.image_prompt,
-            sectionTitle: part.section_title,
-            imageUrl: part.image_url
+            image_prompt: part.image_prompt, // Fixed: Use snake_case
+            section_title: part.section_title, // Fixed: Use snake_case
+            image_url: part.image_url // Fixed: Use snake_case
           })),
-          characterId: selectedCharacter?.id,
-          style: creativeBriefData?.visualStyle || 'realistic'
+          character_id: selectedCharacter?.id, // Fixed: Use snake_case
+          visual_style: creativeBriefData?.visualStyle || 'realistic' // Fixed: Use snake_case
         })
       });
 
@@ -205,14 +203,16 @@ export default function CreateStoryboard() {
       // Step 1: AI analysis
       const llmResponse = await InvokeLLM({
         prompt: `
-          Analyze this story and create a SINGLE visual scene.
+          Analyze this story and create 6 compelling visual scenes that tell the complete story.
 
-          Create detailed character descriptions if characters exist, and generate a specific visual prompt for the scene.
+          Break down the story into 6 distinct scenes that capture the key moments, characters, and narrative flow.
 
-          Provide:
-          1. text: 2-3 sentences describing the scene
+          For each scene, provide:
+          1. text: 2-3 sentences describing what happens in this scene
           2. section_title: Short engaging title (3-5 words)
           3. image_prompt: Detailed visual description for image generation
+
+          Create detailed character descriptions if characters exist, and ensure character consistency across all scenes.
 
           Story: ${textToProcess}
         `,
@@ -223,8 +223,8 @@ export default function CreateStoryboard() {
             character_persona: { type: "string" },
             storyboard_parts: {
               type: "array",
-              minItems: 1,
-              maxItems: 1,
+              minItems: 6,
+              maxItems: 6,
               items: {
                 type: "object",
                 properties: {
@@ -244,6 +244,20 @@ export default function CreateStoryboard() {
 
       if (!llmResponse || !llmResponse.storyboard_parts || llmResponse.storyboard_parts.length === 0) {
         throw new Error("AI could not process your story. Please try a different approach.");
+      }
+
+      // Ensure we have exactly 6 parts
+      if (llmResponse.storyboard_parts.length < 6) {
+        console.warn(`Only got ${llmResponse.storyboard_parts.length} parts instead of 6. Padding with additional scenes.`);
+        // Add placeholder parts if we got fewer than 6
+        while (llmResponse.storyboard_parts.length < 6) {
+          const partIndex = llmResponse.storyboard_parts.length + 1;
+          llmResponse.storyboard_parts.push({
+            text: `Scene ${partIndex}: Additional scene to complete the story.`,
+            image_prompt: `Scene ${partIndex} of the story, continuing the narrative.`,
+            section_title: `Scene ${partIndex}`
+          });
+        }
       }
 
       // Create story record
@@ -288,76 +302,107 @@ export default function CreateStoryboard() {
 
       // Generate images for all storyboard parts
       for (let i = 0; i < updatedParts.length; i++) {
-        try {
-          console.log(`Generating image for part ${i + 1}...`);
+        let imageGenerated = false;
+        let retryCount = 0;
+        const maxRetries = 2;
 
-          const optimizedPrompt = buildOptimizedPrompt(
-            updatedParts[i].image_prompt,
-            characterRef,
-            creativeBriefData?.visualStyle || "realistic",
-            creativeBriefData?.colorTheme || "modern",
-            creativeBriefData?.logoUrl,
-            creativeBriefData?.includeLogo
-          );
+        while (!imageGenerated && retryCount <= maxRetries) {
+          try {
+            console.log(`Generating image for part ${i + 1} (attempt ${retryCount + 1})...`);
 
-          console.log(`Optimized prompt: ${optimizedPrompt}`);
+            const optimizedPrompt = buildOptimizedPrompt(
+              updatedParts[i].image_prompt,
+              characterRef,
+              creativeBriefData?.visualStyle || "realistic",
+              creativeBriefData?.colorTheme || "modern",
+              creativeBriefData?.logoUrl,
+              creativeBriefData?.includeLogo
+            );
 
-          // Prepare character reference images: handle snake_case as well
-          const referenceUrl = 
-            selectedCharacter?.referenceImageUrl ||
-            selectedCharacter?.reference_image_url ||
-            selectedCharacter?.imageUrl ||
-            selectedCharacter?.image_url ||
-            null;
-          const characterReferenceImages = referenceUrl ? [referenceUrl] : [];
+            console.log(`Optimized prompt: ${optimizedPrompt}`);
+
+            // Prepare character reference images: handle snake_case as well
+            const referenceUrl = 
+              selectedCharacter?.referenceImageUrl ||
+              selectedCharacter?.reference_image_url ||
+              selectedCharacter?.imageUrl ||
+              selectedCharacter?.image_url ||
+              null;
+            const characterReferenceImages = referenceUrl ? [referenceUrl] : [];
 
           const imageResult = await runwareImageGeneration({ 
             prompt: optimizedPrompt,
             visualStyle: creativeBriefData?.visualStyle || 'realistic',
+            colorTheme: creativeBriefData?.colorTheme || 'modern',
+            options: {
+              visualStyle: creativeBriefData?.visualStyle || 'realistic',
+              colorTheme: creativeBriefData?.colorTheme || 'modern',
+              storyboardId: createdStory?.id || null,
+              sceneIndex: i
+            },
             characterReferenceImages: characterReferenceImages,
-            logoUrl: creativeBriefData?.logoUrl,
-            includeLogo: creativeBriefData?.includeLogo
+            logoUrl: creativeBriefData?.logoUrl || undefined,
+            includeLogo: Boolean(creativeBriefData?.includeLogo)
           });
 
-          console.log(`Image result for part ${i + 1}:`, imageResult);
+            console.log(`Image result for part ${i + 1}:`, imageResult);
 
-          if (imageResult.data && imageResult.data.url) {
-            updatedParts[i].image_url = imageResult.data.url;
-            console.log(`Successfully generated image for part ${i + 1}`);
-          } else {
-            console.error(`Failed to generate image for part ${i + 1}:`, imageResult);
-            updatedParts[i].image_url = null;
-          }
-
-          // Update display in real-time
-          if (createdStory?.id) {
-            const tempStoryboard = { 
-              ...createdStory, 
-              storyboard_parts: updatedParts.map(part => ({
-                text: String(part.text || ""),
-                image_prompt: String(part.image_prompt || ""),
-                section_title: String(part.section_title || ""),
-                image_url: part.image_url
-              }))
-            };
-            setCurrentStoryboard(tempStoryboard);
-            
-            // Only update database if authenticated
-            if (!createdStory.id.startsWith('local_')) {
-              try {
-                await Story.update(createdStory.id, { storyboard_parts: tempStoryboard.storyboard_parts });
-              } catch (updateError) {
-                console.log("Could not update story in database:", updateError.message);
+            if (imageResult.data && imageResult.data.url) {
+              updatedParts[i].image_url = imageResult.data.url;
+              console.log(`Successfully generated image for part ${i + 1}`);
+              imageGenerated = true;
+            } else {
+              console.error(`Failed to generate image for part ${i + 1}:`, imageResult);
+              updatedParts[i].image_url = null;
+              retryCount++;
+              if (retryCount <= maxRetries) {
+                console.log(`Retrying image generation for part ${i + 1}...`);
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
               }
             }
-          }
 
-        } catch (imageError) {
-          console.error(`Error generating image for first part:`, imageError);
-          updatedParts[0].image_url = null;
+            // Update display in real-time
+            if (createdStory?.id) {
+              const tempStoryboard = { 
+                ...createdStory, 
+                storyboard_parts: updatedParts.map(part => ({
+                  text: String(part.text || ""),
+                  image_prompt: String(part.image_prompt || ""),
+                  section_title: String(part.section_title || ""),
+                  image_url: part.image_url
+                }))
+              };
+              setCurrentStoryboard(tempStoryboard);
+              
+              // Only update database if authenticated
+              if (!createdStory.id.startsWith('local_')) {
+                try {
+                  await Story.update(createdStory.id, { storyboard_parts: tempStoryboard.storyboard_parts });
+                } catch (updateError) {
+                  console.log("Could not update story in database:", updateError.message);
+                }
+              }
+            }
 
-          if (imageError.message && imageError.message.includes('402')) {
-            setErrorMessage("Image generation limit reached. Please check your account credits.");
+          } catch (imageError) {
+            console.error(`Error generating image for part ${i + 1}:`, imageError);
+            updatedParts[i].image_url = null;
+            retryCount++;
+
+            if (imageError.message && imageError.message.includes('402')) {
+              setErrorMessage("Image generation limit reached. Please check your account credits.");
+              break; // Stop trying if we hit rate limits
+            } else if (imageError.message && imageError.message.includes('timeout')) {
+              console.log(`Timeout for part ${i + 1}, will retry...`);
+              if (retryCount <= maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            } else {
+              console.error(`Failed to generate image for part ${i + 1}:`, imageError.message);
+              if (retryCount <= maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            }
           }
         }
       }

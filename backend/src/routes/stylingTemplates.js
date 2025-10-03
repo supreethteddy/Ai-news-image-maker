@@ -61,7 +61,10 @@ router.post('/', authenticateToken, [
   body('name').notEmpty().withMessage('Template name is required'),
   body('visualStyle').notEmpty().withMessage('Visual style is required'),
   body('colorTheme').notEmpty().withMessage('Color theme is required'),
-  body('logoUrl').optional().isString(),
+  body('logoUrl').optional().custom((value) => {
+    if (value === null || value === undefined) return true;
+    return typeof value === 'string';
+  }).withMessage('Logo URL must be a string or null'),
   body('description').optional().isString()
 ], async (req, res) => {
   try {

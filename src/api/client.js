@@ -183,15 +183,21 @@ class ApiClient {
   }
 
   async generateImage(prompt, options = {}, characterReferenceImages = [], logoUrl = null, includeLogo = false) {
+    // Build payload and omit null/undefined fields to satisfy backend validators
+    const payload = { prompt, options };
+    if (Array.isArray(characterReferenceImages) && characterReferenceImages.length > 0) {
+      payload.character_reference_images = characterReferenceImages;
+    }
+    if (typeof logoUrl === 'string' && logoUrl.trim().length > 0) {
+      payload.logoUrl = logoUrl.trim();
+    }
+    if (typeof includeLogo === 'boolean') {
+      payload.includeLogo = includeLogo;
+    }
+
     return this.request('/ai/generate-image', {
       method: 'POST',
-      body: JSON.stringify({ 
-        prompt, 
-        options, 
-        character_reference_images: characterReferenceImages,
-        logoUrl,
-        includeLogo
-      }),
+      body: JSON.stringify(payload),
     });
   }
 

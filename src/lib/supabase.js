@@ -3,12 +3,28 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Create Supabase client with fallback for development
+let supabase = null
+
+try {
+  if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'https://your-project.supabase.co') {
+    supabase = createClient(supabaseUrl, supabaseAnonKey)
+  } else {
+    console.log('⚠️  Supabase not configured - running in development mode without database')
+  }
+} catch (error) {
+  console.log('⚠️  Supabase connection failed - running in development mode without database')
+}
+
+export { supabase }
 
 // Auth helper functions
 export const auth = {
   // Sign up with email and password
   signUp: async (email, password) => {
+    if (!supabase) {
+      return { data: { user: { id: 'dev-user', email } }, error: null }
+    }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -18,6 +34,9 @@ export const auth = {
 
   // Sign in with email and password
   signIn: async (email, password) => {
+    if (!supabase) {
+      return { data: { user: { id: 'dev-user', email } }, error: null }
+    }
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -27,18 +46,27 @@ export const auth = {
 
   // Sign out
   signOut: async () => {
+    if (!supabase) {
+      return { error: null }
+    }
     const { error } = await supabase.auth.signOut()
     return { error }
   },
 
   // Get current user
   getCurrentUser: async () => {
+    if (!supabase) {
+      return { user: { id: 'dev-user', email: 'dev@example.com' }, error: null }
+    }
     const { data: { user }, error } = await supabase.auth.getUser()
     return { user, error }
   },
 
   // Listen to auth changes
   onAuthStateChange: (callback) => {
+    if (!supabase) {
+      return { data: { subscription: { unsubscribe: () => {} } } }
+    }
     return supabase.auth.onAuthStateChange(callback)
   }
 }
@@ -48,6 +76,9 @@ export const db = {
   // Characters
   characters: {
     getAll: async (userId) => {
+      if (!supabase) {
+        return { data: [], error: null }
+      }
       const { data, error } = await supabase
         .from('characters')
         .select('*')
@@ -57,6 +88,9 @@ export const db = {
     },
 
     getById: async (id) => {
+      if (!supabase) {
+        return { data: null, error: null }
+      }
       const { data, error } = await supabase
         .from('characters')
         .select('*')
@@ -66,6 +100,9 @@ export const db = {
     },
 
     create: async (characterData) => {
+      if (!supabase) {
+        return { data: { id: Date.now(), ...characterData }, error: null }
+      }
       const { data, error } = await supabase
         .from('characters')
         .insert([characterData])
@@ -75,6 +112,9 @@ export const db = {
     },
 
     update: async (id, updates) => {
+      if (!supabase) {
+        return { data: { id, ...updates }, error: null }
+      }
       const { data, error } = await supabase
         .from('characters')
         .update(updates)
@@ -85,6 +125,9 @@ export const db = {
     },
 
     delete: async (id) => {
+      if (!supabase) {
+        return { error: null }
+      }
       const { error } = await supabase
         .from('characters')
         .delete()
@@ -96,6 +139,9 @@ export const db = {
   // Storyboards
   storyboards: {
     getAll: async (userId) => {
+      if (!supabase) {
+        return { data: [], error: null }
+      }
       const { data, error } = await supabase
         .from('storyboards')
         .select('*')
@@ -105,6 +151,9 @@ export const db = {
     },
 
     getById: async (id) => {
+      if (!supabase) {
+        return { data: null, error: null }
+      }
       const { data, error } = await supabase
         .from('storyboards')
         .select('*')
@@ -114,6 +163,9 @@ export const db = {
     },
 
     create: async (storyboardData) => {
+      if (!supabase) {
+        return { data: { id: Date.now(), ...storyboardData }, error: null }
+      }
       const { data, error } = await supabase
         .from('storyboards')
         .insert([storyboardData])
@@ -123,6 +175,9 @@ export const db = {
     },
 
     update: async (id, updates) => {
+      if (!supabase) {
+        return { data: { id, ...updates }, error: null }
+      }
       const { data, error } = await supabase
         .from('storyboards')
         .update(updates)
@@ -133,6 +188,9 @@ export const db = {
     },
 
     delete: async (id) => {
+      if (!supabase) {
+        return { error: null }
+      }
       const { error } = await supabase
         .from('storyboards')
         .delete()
@@ -144,6 +202,9 @@ export const db = {
   // Styling Templates
   stylingTemplates: {
     getAll: async (userId) => {
+      if (!supabase) {
+        return { data: [], error: null }
+      }
       const { data, error } = await supabase
         .from('styling_templates')
         .select('*')
@@ -153,6 +214,9 @@ export const db = {
     },
 
     getById: async (id) => {
+      if (!supabase) {
+        return { data: null, error: null }
+      }
       const { data, error } = await supabase
         .from('styling_templates')
         .select('*')
@@ -162,6 +226,9 @@ export const db = {
     },
 
     create: async (templateData) => {
+      if (!supabase) {
+        return { data: { id: Date.now(), ...templateData }, error: null }
+      }
       const { data, error } = await supabase
         .from('styling_templates')
         .insert([templateData])
@@ -171,6 +238,9 @@ export const db = {
     },
 
     update: async (id, updates) => {
+      if (!supabase) {
+        return { data: { id, ...updates }, error: null }
+      }
       const { data, error } = await supabase
         .from('styling_templates')
         .update(updates)
@@ -181,6 +251,9 @@ export const db = {
     },
 
     delete: async (id) => {
+      if (!supabase) {
+        return { error: null }
+      }
       const { error } = await supabase
         .from('styling_templates')
         .delete()

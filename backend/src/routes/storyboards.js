@@ -151,10 +151,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // Create a new storyboard
 router.post('/', authenticateToken, [
   body('title').notEmpty().withMessage('Storyboard title is required'),
-  body('originalText').notEmpty().withMessage('Original text is required'),
-  body('storyboardParts').isArray().withMessage('Storyboard parts must be an array'),
-  body('characterId').optional().isString(),
-  body('style').optional().isString()
+  body('original_text').notEmpty().withMessage('Original text is required'),
+  body('storyboard_parts').isArray().withMessage('Storyboard parts must be an array'),
+  body('character_id').optional().isString(),
+  body('visual_style').optional().isString()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -166,14 +166,14 @@ router.post('/', authenticateToken, [
       });
     }
 
-    const { title, originalText, storyboardParts, characterId, style } = req.body;
+    const { title, original_text, storyboard_parts, character_id, visual_style } = req.body;
 
     const storyboardData = {
       title,
-      original_text: originalText,
-      storyboard_parts: storyboardParts,
-      character_id: characterId,
-      style: style || 'realistic',
+      original_text,
+      storyboard_parts,
+      character_id,
+      style: visual_style || 'realistic',
       user_id: req.user.userId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -220,8 +220,11 @@ router.post('/', authenticateToken, [
 // Update a storyboard
 router.put('/:id', authenticateToken, [
   body('title').optional().notEmpty().withMessage('Title cannot be empty'),
-  body('originalText').optional().notEmpty().withMessage('Original text cannot be empty'),
-  body('storyboardParts').optional().isArray().withMessage('Storyboard parts must be an array')
+  // Accept both snake_case and camelCase payloads from frontend
+  body('original_text').optional().notEmpty(),
+  body('originalText').optional().notEmpty(),
+  body('storyboard_parts').optional().isArray(),
+  body('storyboardParts').optional().isArray()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -233,35 +236,38 @@ router.put('/:id', authenticateToken, [
       });
     }
 
-    const storyboard = storage.getStoryboardById(req.params.id);
-    
-    if (!storyboard) {
-      return res.status(404).json({
-        success: false,
-        message: 'Storyboard not found'
-      });
-    }
-
-    // Check if storyboard belongs to the authenticated user
-    if (storyboard.userId !== req.user.userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
-    const updateData = {
-      ...req.body,
-      updatedAt: new Date().toISOString()
+    // Prefer database; fall back to in-memory storage only if DB fails
+    const normalized = {
+      // prefer snake_case fields for DB
+      title: req.body.title,
+      original_text: req.body.original_text ?? req.body.originalText,
+      storyboard_parts: req.body.storyboard_parts ?? req.body.storyboardParts,
+      updated_at: new Date().toISOString()
     };
 
-    const updatedStoryboard = storage.updateStoryboard(req.params.id, updateData);
-
-    res.json({
-      success: true,
-      data: updatedStoryboard,
-      message: 'Storyboard updated successfully'
-    });
+    try {
+      const updated = await DatabaseService.updateStoryboard(req.params.id, normalized);
+      return res.json({
+        success: true,
+        data: updated,
+        message: 'Storyboard updated successfully'
+      });
+    } catch (dbErr) {
+      console.warn('DB update failed, falling back to memory:', dbErr?.message);
+      const existing = storage.getStoryboardById(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Storyboard not found' });
+      }
+      if (existing.userId !== req.user.userId) {
+        return res.status(403).json({ success: false, message: 'Access denied' });
+      }
+      const updateData = {
+        ...req.body,
+        updatedAt: new Date().toISOString()
+      };
+      const updatedStoryboard = storage.updateStoryboard(req.params.id, updateData);
+      return res.json({ success: true, data: updatedStoryboard, message: 'Storyboard updated successfully (fallback)' });
+    }
   } catch (error) {
     console.error('Error updating storyboard:', error);
     res.status(500).json({

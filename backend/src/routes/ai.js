@@ -15,7 +15,8 @@ const validateImageGeneration = [
   body('prompt').notEmpty().withMessage('Image prompt is required'),
   body('options').optional().isObject(),
   body('character_reference_images').optional().isArray(),
-  body('logoUrl').optional().isString(),
+  // Allow logoUrl to be undefined or a non-empty string; reject empty string
+  body('logoUrl').optional({ nullable: true }).custom((v) => v === undefined || v === null || (typeof v === 'string' && v.trim().length > 0)).withMessage('Invalid value'),
   body('includeLogo').optional().isBoolean()
 ];
 
@@ -122,9 +123,12 @@ router.post('/generate-image', optionalAuth, validateImageGeneration, async (req
     // Merge character reference images into options and add user context
     const enhancedOptions = {
       ...options,
+      // normalize possible camelCase from frontend
+      visual_style: options.visualStyle || options.visual_style || options.style_type || options.style,
+      color_theme: options.colorTheme || options.color_theme,
       character_reference_images: character_reference_images,
-      logoUrl: logoUrl,
-      includeLogo: includeLogo,
+      logoUrl: typeof logoUrl === 'string' && logoUrl.trim().length > 0 ? logoUrl.trim() : undefined,
+      includeLogo: typeof includeLogo === 'boolean' ? includeLogo : undefined,
       userId: req.user?.userId || null,
       storyboardId: options.storyboardId || null,
       sceneIndex: options.sceneIndex || 0

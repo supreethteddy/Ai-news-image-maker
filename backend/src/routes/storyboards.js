@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth.js';
+import { checkCredits, deductCredits, addCreditBalance } from '../middleware/creditCheck.js';
 import storage from '../storage/inMemoryStorage.js';
 import DatabaseService from '../services/databaseService.js';
 
@@ -65,23 +66,30 @@ router.get('/stories/:id', authenticateToken, async (req, res) => {
 });
 
 // Get all storyboards for authenticated user
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, addCreditBalance, async (req, res) => {
   try {
     const storyboards = await DatabaseService.getStoryboardsByUser(req.user.userId);
     res.json({
       success: true,
-      data: storyboards
+      data: storyboards,
+      userCredits: res.locals.userCredits
     });
   } catch (error) {
-    console.error('Error fetching storyboards:', error);
-    // Fallback to in-memory storage
+    console.error('Error fetching storyboards from database:', error);
+    // Only fallback to in-memory storage if database is completely unavailable
     try {
       const storyboards = storage.getStoryboardsByUser(req.user.userId);
+      // Filter out any potential duplicates by ID
+      const uniqueStoryboards = storyboards.filter((storyboard, index, self) => 
+        index === self.findIndex(s => s.id === storyboard.id)
+      );
       res.json({
         success: true,
-        data: storyboards
+        data: uniqueStoryboards,
+        userCredits: res.locals.userCredits
       });
     } catch (fallbackError) {
+      console.error('Error fetching from in-memory storage:', fallbackError);
       res.status(500).json({
         success: false,
         message: 'Failed to fetch storyboards'
@@ -149,13 +157,18 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Create a new storyboard
-router.post('/', authenticateToken, [
-  body('title').notEmpty().withMessage('Storyboard title is required'),
-  body('original_text').notEmpty().withMessage('Original text is required'),
-  body('storyboard_parts').isArray().withMessage('Storyboard parts must be an array'),
-  body('character_id').optional().isString(),
-  body('visual_style').optional().isString()
-], async (req, res) => {
+router.post('/', 
+  authenticateToken, 
+  checkCredits(1), // Require 1 credit for storyboard creation
+  [
+    body('title').notEmpty().withMessage('Storyboard title is required'),
+    body('original_text').notEmpty().withMessage('Original text is required'),
+    body('storyboard_parts').isArray().withMessage('Storyboard parts must be an array'),
+    body('character_id').optional().isString(),
+    body('visual_style').optional().isString()
+  ],
+  deductCredits('Storyboard creation'), // Deduct credits after validation
+  async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -181,10 +194,14 @@ router.post('/', authenticateToken, [
 
     const storyboard = await DatabaseService.createStoryboard(storyboardData);
 
+    // Get updated credit balance (credits already deducted by middleware)
+    const userCredits = await DatabaseService.getUserCredits(req.user.userId);
+
     res.status(201).json({
       success: true,
       data: storyboard,
-      message: 'Storyboard saved successfully'
+      message: 'Storyboard saved successfully',
+      userCredits
     });
   } catch (error) {
     console.error('Error creating storyboard:', error);
@@ -280,29 +297,59 @@ router.put('/:id', authenticateToken, [
 // Delete a storyboard
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const storyboard = storage.getStoryboardById(req.params.id);
-    
-    if (!storyboard) {
-      return res.status(404).json({
-        success: false,
-        message: 'Storyboard not found'
+    // Try database first
+    try {
+      const storyboard = await DatabaseService.getStoryboardById(req.params.id);
+      
+      if (!storyboard) {
+        return res.status(404).json({
+          success: false,
+          message: 'Storyboard not found'
+        });
+      }
+
+      // Check if storyboard belongs to the authenticated user
+      if (storyboard.user_id !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      await DatabaseService.deleteStoryboard(req.params.id);
+      
+      res.json({
+        success: true,
+        message: 'Storyboard deleted successfully'
+      });
+    } catch (dbError) {
+      console.error('Database delete failed, trying in-memory storage:', dbError);
+      
+      // Fallback to in-memory storage
+      const storyboard = storage.getStoryboardById(req.params.id);
+      
+      if (!storyboard) {
+        return res.status(404).json({
+          success: false,
+          message: 'Storyboard not found'
+        });
+      }
+
+      // Check if storyboard belongs to the authenticated user
+      if (storyboard.userId !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      storage.deleteStoryboard(req.params.id);
+
+      res.json({
+        success: true,
+        message: 'Storyboard deleted successfully'
       });
     }
-
-    // Check if storyboard belongs to the authenticated user
-    if (storyboard.userId !== req.user.userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
-    storage.deleteStoryboard(req.params.id);
-
-    res.json({
-      success: true,
-      message: 'Storyboard deleted successfully'
-    });
   } catch (error) {
     console.error('Error deleting storyboard:', error);
     res.status(500).json({
@@ -365,6 +412,108 @@ router.get('/:id/images/:imageIndex/download', authenticateToken, async (req, re
       success: false,
       message: 'Failed to download image'
     });
+  }
+});
+
+// Styling Templates routes
+// Get all styling templates for authenticated user
+router.get('/templates', authenticateToken, async (req, res) => {
+  try {
+    const templates = await DatabaseService.getStylingTemplatesByUser(req.user.userId);
+    res.json({
+      success: true,
+      data: templates
+    });
+  } catch (error) {
+    console.error('Error fetching styling templates:', error);
+    // Fallback to in-memory storage
+    try {
+      const templates = storage.getStylingTemplatesByUser(req.user.userId);
+      res.json({
+        success: true,
+        data: templates
+      });
+    } catch (fallbackError) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch styling templates'
+      });
+    }
+  }
+});
+
+// Create a new styling template
+router.post('/templates', authenticateToken, [
+  body('name').notEmpty().withMessage('Template name is required'),
+  body('visual_style').notEmpty().withMessage('Visual style is required'),
+  body('color_theme').notEmpty().withMessage('Color theme is required'),
+  body('logo_url').optional().isString(),
+  body('description').optional().isString()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const templateData = {
+      ...req.body,
+      user_id: req.user.userId
+    };
+
+    const template = await DatabaseService.createStylingTemplate(templateData);
+    res.status(201).json({
+      success: true,
+      data: template
+    });
+  } catch (error) {
+    console.error('Error creating styling template:', error);
+    // Fallback to in-memory storage
+    try {
+      const template = storage.createStylingTemplate({
+        ...req.body,
+        userId: req.user.userId
+      });
+      res.status(201).json({
+        success: true,
+        data: template
+      });
+    } catch (fallbackError) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create styling template'
+      });
+    }
+  }
+});
+
+// Delete a styling template
+router.delete('/templates/:id', authenticateToken, async (req, res) => {
+  try {
+    await DatabaseService.deleteStylingTemplate(req.params.id);
+    res.json({
+      success: true,
+      message: 'Styling template deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting styling template:', error);
+    // Fallback to in-memory storage
+    try {
+      storage.deleteStylingTemplate(req.params.id);
+      res.json({
+        success: true,
+        message: 'Styling template deleted successfully'
+      });
+    } catch (fallbackError) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to delete styling template'
+      });
+    }
   }
 });
 

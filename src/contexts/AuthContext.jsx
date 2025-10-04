@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [credits, setCredits] = useState(null);
 
   // Decode minimal claims from our JWT fallback (dev mode)
   const getUserFromToken = (jwtToken) => {
@@ -216,18 +217,58 @@ export const AuthProvider = ({ children }) => {
     return { success: false, message: 'ChangePassword not implemented yet' };
   };
 
+  // Fetch user credits
+  const fetchCredits = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await fetch('http://localhost:3001/api/credits/balance', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setCredits(data.credits);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching credits:', error);
+    }
+  };
+
+  // Refresh credits (can be called after operations that use credits)
+  const refreshCredits = () => {
+    if (token) {
+      fetchCredits();
+    }
+  };
+
+  // Fetch credits when user logs in or token changes
+  React.useEffect(() => {
+    if (token && user) {
+      fetchCredits();
+    } else {
+      setCredits(null);
+    }
+  }, [token, user]);
+
   const isAuthenticated = !!user && !!token;
 
   const value = {
     user,
     token,
     loading,
+    credits,
     isAuthenticated,
     login,
     register,
     logout,
     updateProfile,
     changePassword,
+    refreshCredits,
   };
 
   return (

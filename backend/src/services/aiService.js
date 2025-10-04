@@ -182,23 +182,30 @@ export class IdeogramService {
           PHOTOREALISTIC: 'REALISTIC',
           PHOTO: 'REALISTIC',
           CINEMATIC: 'REALISTIC',
-          COMIC: 'COMIC',
-          SKETCH: 'SKETCH',
-          WATERCOLOR: 'WATERCOLOR',
-          VECTOR: 'VECTOR',
-          ILLUSTRATED: 'ILLUSTRATION',
-          ILLUSTRATION: 'ILLUSTRATION',
+          CARTOON: 'STYLIZED',
+          ANIME: 'STYLIZED',
+          COMIC: 'STYLIZED',
+          SKETCH: 'STYLIZED',
+          WATERCOLOR: 'STYLIZED',
+          OIL_PAINTING: 'REALISTIC',
+          VECTOR: 'DESIGN',
+          ILLUSTRATED: 'STYLIZED',
+          ILLUSTRATION: 'STYLIZED',
           MINIMALIST: 'GENERAL',
-          GENERAL: 'GENERAL'
+          GENERAL: 'GENERAL',
+          AUTO: 'AUTO',
+          DESIGN: 'DESIGN',
+          CUSTOM: 'CUSTOM',
+          FICTION: 'FICTION',
+          STYLIZED: 'STYLIZED'
         };
         return map[key] || 'GENERAL';
       };
+      // According to Ideogram API docs, style_preset can only be used with AUTO or GENERAL style types
       const stylePresetMap = {
-        SKETCH: 'HALFTONE_PRINT',
-        COMIC: 'C4D_CARTOON',
-        WATERCOLOR: 'WATERCOLOR',
-        VECTOR: 'VECTOR_GRAPHIC',
-        ILLUSTRATION: 'ABSTRACT_ORGANIC'
+        AUTO: 'GOLDEN_HOUR',
+        GENERAL: 'ABSTRACT_ORGANIC'
+        // REALISTIC, STYLIZED, DESIGN, FICTION, CUSTOM cannot use style_preset
       };
       const requestedStyle = options.style_type || options.visual_style || options.style || 'GENERAL';
       let styleType = normalizeStyle(requestedStyle);
@@ -216,9 +223,9 @@ export class IdeogramService {
         // Character reference supports a limited set; fallback if unsupported
         const crAllowed = new Set(['AUTO', 'REALISTIC', 'FICTION']);
         formData.append('style_type', crAllowed.has(styleType) ? styleType : 'REALISTIC');
-        // When not REALISTIC, apply a style_preset to bias aesthetics if CR forces REALISTIC
+        // Only apply style_preset for AUTO or GENERAL style types
         const presetKey = stylePresetMap[styleType];
-        if (presetKey) {
+        if (presetKey && (styleType === 'AUTO' || styleType === 'GENERAL')) {
           formData.append('style_preset', presetKey);
         }
         // Add color theme if provided
@@ -346,7 +353,7 @@ export class IdeogramService {
         num_images: 1,
         style_type: styleType,
         aspect_ratio: options?.aspect_ratio || '16x9', // Fixed: Default to correct format
-        ...(stylePresetMap[styleType] ? { style_preset: stylePresetMap[styleType] } : {}),
+        ...(stylePresetMap[styleType] && (styleType === 'AUTO' || styleType === 'GENERAL') ? { style_preset: stylePresetMap[styleType] } : {}),
         ...(options?.color_theme ? { color_theme: String(options.color_theme).toUpperCase() } : {}),
         // Reduce magic prompt impact to avoid overriding style
         magic_prompt: options?.magic_prompt === true ? 'ON' : 'OFF'

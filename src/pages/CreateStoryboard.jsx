@@ -7,12 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Loader2, Wand2, BookOpenText, ArrowRight, Info } from "lucide-react";
+import { Sparkles, Loader2, Wand2, BookOpenText, ArrowRight, Info, Palette, Layout, Building2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import StoryboardDisplay from "../components/storyboard/StoryboardDisplay";
 import SimplifiedCreativeBrief from "../components/creation/SimplifiedCreativeBrief";
 import { VISUAL_STYLES, COLOR_THEMES } from "../components/creation/StyleSelector";
 import CharacterSelector from "../components/CharacterSelector";
+import TemplatesSidebar from "../components/TemplatesSidebar";
+import CreateTemplateModal from "../components/CreateTemplateModal";
+import BrandProfileSelector from "../components/BrandProfileSelector";
+import CreateBrandModal from "../components/CreateBrandModal";
+import CreditBalance from "../components/ui/CreditBalance";
+import LowCreditWarning from "../components/ui/LowCreditWarning";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -24,7 +30,12 @@ export default function CreateStoryboard() {
   const [showCreativeBrief, setShowCreativeBrief] = useState(false);
   const [creativeBriefData, setCreativeBriefData] = useState(null);
   const [selectedCharacter, setSelectedCharacter] = useState(null);
-  const { isAuthenticated, token, user, logout } = useAuth();
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+  const [showBrandProfiles, setShowBrandProfiles] = useState(false);
+  const [showCreateBrand, setShowCreateBrand] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState(null);
+  const { isAuthenticated, token, user, logout, credits, refreshCredits } = useAuth();
 
   // Character consistency helper
   const extractCharacterReference = (characterPersona) => {
@@ -134,6 +145,37 @@ export default function CreateStoryboard() {
     setShowCreativeBrief(false);
   };
 
+  // Handle template selection
+  const handleTemplateSelect = (templateData) => {
+    setCreativeBriefData({
+      visualStyle: templateData.visual_style || templateData.visualStyle,
+      colorTheme: templateData.color_theme || templateData.colorTheme,
+      logoUrl: templateData.logo_url || templateData.logoUrl,
+      description: templateData.description
+    });
+    setShowTemplates(false);
+    toast.success('Template applied successfully!');
+  };
+
+  const handleBrandSelect = (brandData) => {
+    setSelectedBrand(brandData);
+    setShowBrandProfiles(false);
+    toast.success(`Brand profile "${brandData.brand_name}" selected!`);
+  };
+
+  const handleBrandCreated = (brandData) => {
+    setSelectedBrand(brandData);
+    setShowCreateBrand(false);
+    setShowBrandProfiles(false);
+    toast.success('Brand profile created and selected!');
+  };
+
+  // Handle template creation
+  const handleTemplateCreated = (template) => {
+    toast.success('Template created successfully!');
+    setShowCreateTemplate(false);
+  };
+
   // Save storyboard to backend
   const saveStoryboardToBackend = async (storyboardData) => {
     if (!isAuthenticated || !token) {
@@ -165,6 +207,12 @@ export default function CreateStoryboard() {
       if (response.ok) {
         const data = await response.json();
         toast.success('Storyboard saved successfully!');
+        
+        // Refresh credits after successful storyboard creation
+        if (refreshCredits) {
+          refreshCredits();
+        }
+        
         return data.data;
       } else {
         console.error('Failed to save storyboard:', await response.text());
@@ -179,6 +227,12 @@ export default function CreateStoryboard() {
   };
 
   const handleSubmit = async () => {
+    // Only authenticated users with credits can create storyboards
+    if (!isAuthenticated || !token || !user) {
+      setErrorMessage("Please log in to create storyboards. Only registered users with credits can create stories.");
+      return;
+    }
+
     // Safe string validation
     const textToProcess = String(originalText || "").trim();
     if (!textToProcess) {
@@ -188,6 +242,13 @@ export default function CreateStoryboard() {
 
     if (!creativeBriefData) {
       setErrorMessage("Please select a visual style first by clicking 'Start Styling' above.");
+      return;
+    }
+
+    // Check if user has sufficient credits
+    if (credits !== null && credits < 1) {
+      setErrorMessage("You don't have enough credits to generate a storyboard. You need 1 credit per storyboard.");
+      toast.error("Insufficient credits! You need 1 credit to generate a storyboard.");
       return;
     }
 
@@ -277,6 +338,7 @@ export default function CreateStoryboard() {
       };
 
       console.log("Creating story record...");
+      
       try {
         createdStory = await Story.create(initialStoryboardData);
         setCurrentStoryboard(createdStory);
@@ -421,16 +483,14 @@ export default function CreateStoryboard() {
         };
         setCurrentStoryboard(finalStoryboard);
         
-        // Save to backend storyboards API
-        await saveStoryboardToBackend(finalStoryboard);
-        
-        // Only update database if authenticated
+        // Only update database if authenticated (don't create a new storyboard)
         if (!createdStory.id.startsWith('local_')) {
           try {
             await Story.update(createdStory.id, {
               status: "completed",
               storyboard_parts: finalStoryboard.storyboard_parts
             });
+            toast.success('Storyboard saved successfully!');
           } catch (updateError) {
             console.log("Could not update story completion in database:", updateError.message);
           }
@@ -498,12 +558,15 @@ export default function CreateStoryboard() {
               <p className="text-lg md:text-xl font-semibold text-slate-700">
                 Welcome back, <span className="text-purple-600">{user.name}</span>! 👋
               </p>
-              <button 
-                onClick={logout}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                Logout
-              </button>
+              <div className="flex items-center gap-4">
+                <CreditBalance showLabel={true} />
+                <button 
+                  onClick={logout}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           )}
           {!user && (
@@ -519,6 +582,15 @@ export default function CreateStoryboard() {
           </p>
         </motion.div>
 
+        {/* Low Credit Warning */}
+        {isAuthenticated && (
+          <LowCreditWarning 
+            threshold={3} 
+            variant="banner" 
+            className="mb-6"
+          />
+        )}
+
         {/* Creative Brief Banner */}
         {!creativeBriefData && (
           <motion.div
@@ -529,20 +601,38 @@ export default function CreateStoryboard() {
           >
             <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
               <CardContent className="p-4 md:p-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-slate-800 mb-2">🎨 Want better, more consistent results?</h3>
                     <p className="text-slate-600 text-sm md:text-base">
-                      Select a Brand or create a new one to define your visual style for consistent results.
+                      Choose from saved templates or create a new styling configuration for consistent results.
                     </p>
                   </div>
-                  <Button
-                    onClick={() => setShowCreativeBrief(true)}
-                    className="ml-4 bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    Start Styling
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  <div className="flex gap-2 flex-wrap">
+{/* <Button
+                      onClick={() => setShowTemplates(true)}
+                      variant="outline"
+                      className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                    >
+                      <Layout className="w-4 h-4 mr-2" />
+                      Use Template
+                    </Button> */}
+{/* <Button
+                      onClick={() => setShowBrandProfiles(true)}
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                    >
+                      <Building2 className="w-4 h-4 mr-2" />
+                      Brand Profile
+                    </Button> */}
+                    <Button
+                      onClick={() => setShowCreativeBrief(true)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      <Palette className="w-4 h-4 mr-2" />
+                      Custom Style
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -696,6 +786,37 @@ export default function CreateStoryboard() {
               onStoryboardUpdate={handleStoryboardUpdate}
             />
           </motion.div>
+        )}
+
+        {/* Template Modals */}
+        {showTemplates && (
+          <TemplatesSidebar
+            onTemplateSelect={handleTemplateSelect}
+            onClose={() => setShowTemplates(false)}
+          />
+        )}
+
+        {showCreateTemplate && (
+          <CreateTemplateModal
+            onTemplateCreated={handleTemplateCreated}
+            onClose={() => setShowCreateTemplate(false)}
+          />
+        )}
+
+        {showBrandProfiles && (
+          <BrandProfileSelector
+            onBrandSelect={handleBrandSelect}
+            onClose={() => setShowBrandProfiles(false)}
+            selectedBrand={selectedBrand}
+            onCreateBrand={() => setShowCreateBrand(true)}
+          />
+        )}
+
+        {showCreateBrand && (
+          <CreateBrandModal
+            onBrandCreated={handleBrandCreated}
+            onClose={() => setShowCreateBrand(false)}
+          />
         )}
       </div>
     </motion.div>

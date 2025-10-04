@@ -8,13 +8,15 @@ import dotenv from 'dotenv';
 
 // Import routes
 import storyRoutes from './routes/stories.js';
-import brandRoutes from './routes/brands.js';
+// import brandRoutes from './routes/brands.js'; // Removed - using user profiles only
 import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
 import characterRoutes from './routes/characters.js';
 import uploadRoutes from './routes/upload.js';
 import storyboardRoutes from './routes/storyboards.js';
 import stylingTemplateRoutes from './routes/stylingTemplates.js';
+import adminRoutes from './routes/admin.js';
+import creditRoutes from './routes/credits.js';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -67,13 +69,15 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/stories', storyRoutes);
-app.use('/api/brands', brandRoutes);
+// app.use('/api/brands', brandRoutes); // Removed - using user profiles only
 app.use('/api/auth', authRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/characters', characterRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/storyboards', storyboardRoutes);
 app.use('/api/styling-templates', stylingTemplateRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/credits', creditRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -89,7 +93,8 @@ app.get('/', (req, res) => {
       characters: '/api/characters',
       upload: '/api/upload',
       storyboards: '/api/storyboards',
-      stylingTemplates: '/api/styling-templates'
+      stylingTemplates: '/api/styling-templates',
+      admin: '/api/admin'
     }
   });
 });

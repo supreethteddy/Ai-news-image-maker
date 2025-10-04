@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth.js';
-import storage from '../storage/inMemoryStorage.js';
+import { DatabaseService } from '../services/databaseService.js';
 
 const router = express.Router();
 
@@ -22,7 +22,7 @@ const validateBrandProfile = [
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const brandProfiles = storage.listBrandProfiles(userId);
+    const brandProfiles = await DatabaseService.getBrandProfilesByUser(userId);
     
     res.json({
       success: true,
@@ -30,6 +30,7 @@ router.get('/', authenticateToken, async (req, res) => {
       count: brandProfiles.length
     });
   } catch (error) {
+    console.error('Error fetching brand profiles:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch brand profiles'
@@ -37,10 +38,36 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/brands/default - Get the default brand profile (must be before /:id route)
+router.get('/default', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const defaultProfile = await DatabaseService.getDefaultBrandProfile(userId);
+    
+    if (!defaultProfile) {
+      return res.status(404).json({
+        success: false,
+        error: 'No default brand profile found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: defaultProfile
+    });
+  } catch (error) {
+    console.error('Error fetching default brand profile:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch default brand profile'
+    });
+  }
+});
+
 // GET /api/brands/:id - Get a specific brand profile
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const brandProfile = storage.getBrandProfile(req.params.id);
+    const brandProfile = await DatabaseService.getBrandProfileById(req.params.id);
     
     if (!brandProfile) {
       return res.status(404).json({
@@ -62,6 +89,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       data: brandProfile
     });
   } catch (error) {
+    console.error('Error fetching brand profile:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch brand profile'
@@ -90,15 +118,15 @@ router.post('/', authenticateToken, validateBrandProfile, async (req, res) => {
 
     // If this is set as default, unset other defaults
     if (brandData.is_default) {
-      const existingProfiles = storage.listBrandProfiles(userId);
-      existingProfiles.forEach(profile => {
+      const existingProfiles = await DatabaseService.getBrandProfilesByUser(userId);
+      for (const profile of existingProfiles) {
         if (profile.is_default) {
-          storage.updateBrandProfile(profile.id, { is_default: false });
+          await DatabaseService.updateBrandProfile(profile.id, { is_default: false });
         }
-      });
+      }
     }
 
-    const brandProfile = storage.createBrandProfile(brandData);
+    const brandProfile = await DatabaseService.createBrandProfile(brandData);
     
     res.status(201).json({
       success: true,
@@ -127,7 +155,7 @@ router.put('/:id', authenticateToken, validateBrandProfile, async (req, res) => 
       });
     }
 
-    const brandProfile = storage.getBrandProfile(req.params.id);
+    const brandProfile = await DatabaseService.getBrandProfileById(req.params.id);
     
     if (!brandProfile) {
       return res.status(404).json({
@@ -147,15 +175,15 @@ router.put('/:id', authenticateToken, validateBrandProfile, async (req, res) => 
     // If this is set as default, unset other defaults
     if (req.body.is_default) {
       const userId = req.user.userId;
-      const existingProfiles = storage.listBrandProfiles(userId);
-      existingProfiles.forEach(profile => {
+      const existingProfiles = await DatabaseService.getBrandProfilesByUser(userId);
+      for (const profile of existingProfiles) {
         if (profile.is_default && profile.id !== req.params.id) {
-          storage.updateBrandProfile(profile.id, { is_default: false });
+          await DatabaseService.updateBrandProfile(profile.id, { is_default: false });
         }
-      });
+      }
     }
 
-    const updatedProfile = storage.updateBrandProfile(req.params.id, req.body);
+    const updatedProfile = await DatabaseService.updateBrandProfile(req.params.id, req.body);
     
     res.json({
       success: true,
@@ -174,7 +202,7 @@ router.put('/:id', authenticateToken, validateBrandProfile, async (req, res) => 
 // DELETE /api/brands/:id - Delete a brand profile
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const brandProfile = storage.getBrandProfile(req.params.id);
+    const brandProfile = await DatabaseService.getBrandProfileById(req.params.id);
     
     if (!brandProfile) {
       return res.status(404).json({
@@ -191,13 +219,14 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    storage.deleteBrandProfile(req.params.id);
+    await DatabaseService.deleteBrandProfile(req.params.id);
     
     res.json({
       success: true,
       message: 'Brand profile deleted successfully'
     });
   } catch (error) {
+    console.error('Error deleting brand profile:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to delete brand profile'
@@ -205,36 +234,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/brands/default - Get the default brand profile
-router.get('/default', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const brandProfiles = storage.listBrandProfiles(userId);
-    const defaultProfile = brandProfiles.find(profile => profile.is_default);
-    
-    if (!defaultProfile) {
-      return res.status(404).json({
-        success: false,
-        error: 'No default brand profile found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: defaultProfile
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch default brand profile'
-    });
-  }
-});
-
 // POST /api/brands/:id/set-default - Set a brand profile as default
 router.post('/:id/set-default', authenticateToken, async (req, res) => {
   try {
-    const brandProfile = storage.getBrandProfile(req.params.id);
+    const brandProfile = await DatabaseService.getBrandProfileById(req.params.id);
     
     if (!brandProfile) {
       return res.status(404).json({
@@ -253,15 +256,15 @@ router.post('/:id/set-default', authenticateToken, async (req, res) => {
 
     // Unset other defaults
     const userId = req.user.userId;
-    const existingProfiles = storage.listBrandProfiles(userId);
-    existingProfiles.forEach(profile => {
+    const existingProfiles = await DatabaseService.getBrandProfilesByUser(userId);
+    for (const profile of existingProfiles) {
       if (profile.is_default) {
-        storage.updateBrandProfile(profile.id, { is_default: false });
+        await DatabaseService.updateBrandProfile(profile.id, { is_default: false });
       }
-    });
+    }
 
     // Set this one as default
-    const updatedProfile = storage.updateBrandProfile(req.params.id, { is_default: true });
+    const updatedProfile = await DatabaseService.updateBrandProfile(req.params.id, { is_default: true });
     
     res.json({
       success: true,
@@ -269,6 +272,7 @@ router.post('/:id/set-default', authenticateToken, async (req, res) => {
       message: 'Brand profile set as default successfully'
     });
   } catch (error) {
+    console.error('Error setting brand profile as default:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to set brand profile as default'

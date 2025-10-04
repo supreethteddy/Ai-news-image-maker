@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { BrandProfile } from "@/api/entities";
+// BrandProfile import removed - using user profiles only
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,9 +52,10 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
     }
   }, [stylingTemplates, selectedTemplate]);
 
-  const loadBrandProfiles = async () => {
+  const loadBrandProfiles = () => {
     try {
-      const profiles = await BrandProfile.list("-created_date");
+      const stored = localStorage.getItem('brandProfiles');
+      const profiles = stored ? JSON.parse(stored) : [];
       setBrandProfiles(profiles);
       
       const defaultProfile = profiles.find(p => p.is_default);
@@ -64,6 +65,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
       }
     } catch (error) {
       console.error("Error loading brand profiles:", error);
+      setBrandProfiles([]);
     }
   };
 
@@ -216,25 +218,39 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
     }));
   };
 
-  const saveBrandProfile = async () => {
+  const saveBrandProfile = () => {
     // FIX: Defensive check before calling trim()
-    if (typeof briefData.brand_name !== 'string' || !briefData.brand_name.trim()) return;
+    if (typeof briefData.brand_name !== 'string' || !briefData.brand_name.trim()) {
+      toast.error('Please enter a brand name');
+      return;
+    }
     
     setSaving(true);
     try {
       const profileData = {
+        id: `brand-${Date.now()}`,
         brand_name: briefData.brand_name,
-        visual_style: briefData.visual_style,
-        color_theme: briefData.color_theme,
-        is_default: brandProfiles.length === 0
+        core_colors: briefData.core_colors || [],
+        brand_personality: briefData.brand_personality || '',
+        visual_style_preference: briefData.visual_style || '',
+        mood_preference: briefData.mood_preference || '',
+        target_audience: briefData.target_audience || '',
+        design_language_notes: briefData.design_language_notes || '',
+        reference_images: briefData.reference_images || [],
+        is_default: brandProfiles.length === 0, // First profile is default
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      const savedProfile = await BrandProfile.create(profileData);
-      setBrandProfiles(prev => [savedProfile, ...prev]);
-      setSelectedBrandProfile(savedProfile);
+      const updatedProfiles = [...brandProfiles, profileData];
+      localStorage.setItem('brandProfiles', JSON.stringify(updatedProfiles));
+      setBrandProfiles(updatedProfiles);
+      setSelectedBrandProfile(profileData);
       setIsCreatingNewProfile(false);
+      toast.success('Brand profile saved successfully!');
     } catch (error) {
       console.error("Error saving brand profile:", error);
+      toast.error('Failed to save brand profile');
     }
     setSaving(false);
   };
@@ -313,8 +329,12 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
                         )}
                       </div>
                       <div className="flex gap-2 mt-2">
-                        <Badge variant="outline" className="capitalize">{template.visualStyle.replace('_', ' ')}</Badge>
-                        <Badge variant="outline" className="capitalize">{template.colorTheme}</Badge>
+                        {template.visualStyle && (
+                          <Badge variant="outline" className="capitalize">{template.visualStyle.replace('_', ' ')}</Badge>
+                        )}
+                        {template.colorTheme && (
+                          <Badge variant="outline" className="capitalize">{template.colorTheme}</Badge>
+                        )}
                         {template.logoUrl && <Badge variant="outline">With Logo</Badge>}
                       </div>
                     </div>
@@ -351,7 +371,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3">
-              {brandProfiles.map((profile) => (
+              {(brandProfiles || []).map((profile) => (
                 <div
                   key={profile.id}
                   className={`p-4 border rounded-lg cursor-pointer transition-all ${
@@ -366,8 +386,22 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
                 >
                   <h3 className="font-semibold text-slate-800">{profile.brand_name}</h3>
                   <div className="flex gap-2 mt-2">
-                    <Badge variant="outline" className="capitalize">{profile.visual_style.replace('_', ' ')}</Badge>
-                    <Badge variant="outline" className="capitalize">{profile.color_theme}</Badge>
+                    {(profile.visual_style || profile.visual_style_preference) && (
+                      <Badge variant="outline" className="capitalize">
+                        {(profile.visual_style || profile.visual_style_preference).replace('_', ' ')}
+                      </Badge>
+                    )}
+                    {profile.color_theme && (
+                      <Badge variant="outline" className="capitalize">{profile.color_theme}</Badge>
+                    )}
+                    {profile.core_colors && profile.core_colors.length > 0 && (
+                      <Badge variant="outline">
+                        {profile.core_colors.length} color{profile.core_colors.length > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                    {profile.brand_personality && (
+                      <Badge variant="outline" className="capitalize">{profile.brand_personality}</Badge>
+                    )}
                   </div>
                 </div>
               ))}

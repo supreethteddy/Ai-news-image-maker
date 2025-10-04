@@ -123,44 +123,7 @@ class ApiClient {
     });
   }
 
-  // Brand Profile methods
-  async getBrandProfiles() {
-    return this.request('/brands');
-  }
-
-  async getBrandProfile(id) {
-    return this.request(`/brands/${id}`);
-  }
-
-  async getDefaultBrandProfile() {
-    return this.request('/brands/default');
-  }
-
-  async createBrandProfile(brandData) {
-    return this.request('/brands', {
-      method: 'POST',
-      body: JSON.stringify(brandData),
-    });
-  }
-
-  async updateBrandProfile(id, brandData) {
-    return this.request(`/brands/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(brandData),
-    });
-  }
-
-  async deleteBrandProfile(id) {
-    return this.request(`/brands/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async setDefaultBrandProfile(id) {
-    return this.request(`/brands/${id}/set-default`, {
-      method: 'POST',
-    });
-  }
+  // Brand Profile methods - REMOVED (using user profiles only)
 
   // AI methods
   async generateStoryboard(articleText, brandPreferences = {}) {

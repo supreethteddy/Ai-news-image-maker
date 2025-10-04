@@ -1,12 +1,13 @@
 
 
 import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import AuthModal from "@/components/AuthModal.jsx";
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
+import CreditBalance from "@/components/ui/CreditBalance";
 // Removed: Sparkles, LayoutDashboard, Palette from 'lucide-react' as they are replaced by custom images.
 import {
   Sidebar,
@@ -43,6 +44,7 @@ const navigationItems = [
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [showSplash, setShowSplash] = useState(true);
   const { user, isAuthenticated, logout, loading } = useAuth();
 
@@ -53,6 +55,14 @@ export default function Layout({ children, currentPageName }) {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Auto-redirect admin users to admin dashboard
+  useEffect(() => {
+    if (isAuthenticated && user && user.role === 'admin' && !location.pathname.startsWith('/admin')) {
+      console.log('🔄 Admin user detected, redirecting to admin dashboard...');
+      navigate('/admin', { replace: true });
+    }
+  }, [isAuthenticated, user, location.pathname, navigate]);
 
   if (showSplash) {
     return (
@@ -170,6 +180,17 @@ export default function Layout({ children, currentPageName }) {
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+
+            {/* Credit Balance Section */}
+            {isAuthenticated && (
+              <SidebarGroup className="mt-4">
+                <SidebarGroupContent>
+                  <div className="px-3 md:px-4 py-3">
+                    <CreditBalance showLabel={true} variant="sidebar" />
+                  </div>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
 
             <SidebarGroup className="mt-6 md:mt-8">
               <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-3">

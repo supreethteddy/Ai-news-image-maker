@@ -103,13 +103,14 @@ router.post('/register', [
     const user = storage.createUser(userData);
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
     const token = jwt.sign(
       { 
         userId: user.id, 
         email: user.email,
         name: user.name 
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      jwtSecret,
       { expiresIn: '7d' }
     );
 
@@ -180,7 +181,25 @@ router.post('/login', [
           console.error('Profile fetch error:', profileError);
         }
 
+        // Check if user is banned or inactive
+        if (profile?.status === 'banned') {
+          return res.status(403).json({
+            success: false,
+            message: 'Your account has been banned. Please contact support for assistance.',
+            reason: profile.status_reason || 'Account banned by administrator'
+          });
+        }
+
+        if (profile?.status === 'inactive') {
+          return res.status(403).json({
+            success: false,
+            message: 'Your account is inactive. Please contact support to reactivate your account.',
+            reason: profile.status_reason || 'Account deactivated'
+          });
+        }
+
         // Generate a JWT token for the session
+        const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
         const token = jwt.sign(
           { 
             userId: data.user.id, 
@@ -188,7 +207,7 @@ router.post('/login', [
             name: profile?.name || data.user.user_metadata?.name || 'User',
             role: profile?.role || 'user'
           },
-          process.env.JWT_SECRET || 'fallback-secret',
+          jwtSecret,
           { expiresIn: '7d' }
         );
 
@@ -231,13 +250,14 @@ router.post('/login', [
     }
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
     const token = jwt.sign(
       { 
         userId: user.id, 
         email: user.email,
         name: user.name 
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      jwtSecret,
       { expiresIn: '7d' }
     );
 
@@ -262,8 +282,42 @@ router.post('/login', [
 });
 
 // Get current user profile
-router.get('/profile', authenticateToken, (req, res) => {
+router.get('/profile', authenticateToken, async (req, res) => {
   try {
+    // Try to get user profile from Supabase first
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', req.user.userId)
+        .single();
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        throw profileError;
+      }
+
+      if (profile) {
+        return res.json({
+          success: true,
+          data: {
+            user: {
+              id: profile.id,
+              email: profile.email,
+              firstName: profile.first_name,
+              lastName: profile.last_name,
+              name: profile.name,
+              role: profile.role,
+              credits: profile.credits || 0
+            }
+          }
+        });
+      }
+    } catch (supabaseError) {
+      console.error('Supabase profile fetch failed, falling back to in-memory storage:', supabaseError.message);
+    }
+
+    // Fallback to in-memory storage
     const user = storage.getUser(req.user.userId);
     if (!user) {
       return res.status(404).json({

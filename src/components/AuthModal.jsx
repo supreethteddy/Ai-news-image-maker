@@ -91,8 +91,13 @@ const AuthModal = ({ isOpen, onClose }) => {
       if (result.success) {
         toast.success('Welcome back!');
         onClose();
-        // Redirect to dashboard
-        window.location.href = '/CreateStoryboard';
+        
+        // Redirect based on user role
+        if (result.user && result.user.role === 'admin') {
+          window.location.href = '/admin';
+        } else {
+          window.location.href = '/CreateStoryboard';
+        }
       } else {
         // Check if it's an email confirmation error
         if (result.message && result.message.includes('confirmation link')) {

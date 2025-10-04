@@ -2,7 +2,7 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 
-// Only expose styles supported by Ideogram style_type
+// Only expose styles supported by Ideogram style_type: AUTO, GENERAL, REALISTIC, DESIGN, CUSTOM, FICTION, STYLIZED
 const VISUAL_STYLES = [
   { 
     key: "general", 
@@ -21,44 +21,36 @@ const VISUAL_STYLES = [
     bgGradient: "from-blue-600 to-blue-400"
   },
   { 
-    key: "illustration", 
-    name: "Illustration", 
-    description: "Digital illustration, clean artwork", 
-    prompt: "digital illustration, clean artwork, vibrant colors, smooth rendering",
-    icon: "🖼️",
+    key: "stylized", 
+    name: "Stylized", 
+    description: "Artistic, creative interpretation", 
+    prompt: "stylized art, creative interpretation, artistic style, enhanced visuals",
+    icon: "🎨",
     bgGradient: "from-purple-500 to-pink-400"
   },
   { 
-    key: "comic", 
-    name: "Comic", 
-    description: "Comic book style, bold outlines", 
-    prompt: "comic book style, bold outlines, flat colors, pop art aesthetic",
-    icon: "💥",
-    bgGradient: "from-red-500 to-yellow-400"
-  },
-  { 
-    key: "sketch", 
-    name: "Sketch", 
-    description: "Hand-drawn, pencil lines", 
-    prompt: "pencil sketch, hand-drawn, artistic lines, monochrome sketch style",
-    icon: "✏️",
-    bgGradient: "from-gray-600 to-gray-400"
-  },
-  { 
-    key: "watercolor", 
-    name: "Watercolor", 
-    description: "Soft textures, brushstrokes", 
-    prompt: "watercolor painting, soft brush strokes, artistic texture, painted style",
-    icon: "🎨",
-    bgGradient: "from-pink-400 to-purple-300"
-  },
-  { 
-    key: "vector", 
-    name: "Vector", 
-    description: "Clean, geometric, flat colors", 
-    prompt: "vector art, clean lines, flat colors, geometric shapes, no noise, sharp edges",
+    key: "design", 
+    name: "Design", 
+    description: "Clean, modern design aesthetic", 
+    prompt: "modern design, clean lines, professional layout, graphic design",
     icon: "📐",
-    bgGradient: "from-green-500 to-teal-400"
+    bgGradient: "from-green-500 to-blue-400"
+  },
+  { 
+    key: "fiction", 
+    name: "Fiction", 
+    description: "Fantasy and sci-fi themes", 
+    prompt: "fantasy art, sci-fi aesthetic, imaginative scenes, fictional worlds",
+    icon: "🚀",
+    bgGradient: "from-indigo-500 to-purple-400"
+  },
+  { 
+    key: "auto", 
+    name: "Auto", 
+    description: "Let AI choose the best style", 
+    prompt: "optimal style selection, AI-enhanced visuals, best quality",
+    icon: "🤖",
+    bgGradient: "from-gray-600 to-gray-400"
   }
 ];
 

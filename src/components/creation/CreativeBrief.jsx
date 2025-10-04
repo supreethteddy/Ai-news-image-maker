@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrandProfile } from "@/api/entities";
+// BrandProfile import removed - using user profiles only
 import { UploadFile } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

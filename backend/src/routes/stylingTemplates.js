@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth.js';
-import storage from '../storage/inMemoryStorage.js';
+import { DatabaseService } from '../services/databaseService.js';
 import storageService from '../services/storageService.js';
 
 const router = express.Router();
@@ -9,7 +9,7 @@ const router = express.Router();
 // Get all styling templates for authenticated user
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const templates = storage.getStylingTemplatesByUser(req.user.userId);
+    const templates = await DatabaseService.getStylingTemplatesByUser(req.user.userId);
     res.json({
       success: true,
       data: templates
@@ -26,7 +26,7 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get a specific styling template by ID
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const template = storage.getStylingTemplateById(req.params.id);
+    const template = await DatabaseService.getStylingTemplateById(req.params.id);
     
     if (!template) {
       return res.status(404).json({
@@ -36,7 +36,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     // Check if template belongs to the authenticated user
-    if (template.userId !== req.user.userId) {
+    if (template.user_id !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -103,18 +103,14 @@ router.post('/', authenticateToken, [
 
     const templateData = {
       name,
-      visualStyle,
-      colorTheme,
-      logoUrl: finalLogoUrl,
-      includeLogo: includeLogo || false,
+      visual_style: visualStyle,
+      color_theme: colorTheme,
+      logo_url: finalLogoUrl,
       description: description || '',
-      isDefault: false, // New templates are not default by default
-      userId: req.user.userId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      user_id: req.user.userId
     };
 
-    const template = storage.createStylingTemplate(templateData);
+    const template = await DatabaseService.createStylingTemplate(templateData);
 
     res.status(201).json({
       success: true,
@@ -147,7 +143,7 @@ router.put('/:id', authenticateToken, [
       });
     }
 
-    const template = storage.getStylingTemplateById(req.params.id);
+    const template = await DatabaseService.getStylingTemplateById(req.params.id);
     
     if (!template) {
       return res.status(404).json({
@@ -157,29 +153,19 @@ router.put('/:id', authenticateToken, [
     }
 
     // Check if template belongs to the authenticated user
-    if (template.userId !== req.user.userId) {
+    if (template.user_id !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
       });
     }
 
-    // If setting as default, unset all other templates for this user as default
-    if (req.body.isDefault === true) {
-      const userTemplates = storage.getStylingTemplatesByUser(req.user.userId);
-      userTemplates.forEach(userTemplate => {
-        if (userTemplate.id !== req.params.id && userTemplate.isDefault) {
-          storage.updateStylingTemplate(userTemplate.id, { isDefault: false });
-        }
-      });
-    }
-
     const updateData = {
       ...req.body,
-      updatedAt: new Date().toISOString()
+      updated_at: new Date().toISOString()
     };
 
-    const updatedTemplate = storage.updateStylingTemplate(req.params.id, updateData);
+    const updatedTemplate = await DatabaseService.updateStylingTemplate(req.params.id, updateData);
 
     res.json({
       success: true,
@@ -198,7 +184,7 @@ router.put('/:id', authenticateToken, [
 // Delete a styling template
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const template = storage.getStylingTemplateById(req.params.id);
+    const template = await DatabaseService.getStylingTemplateById(req.params.id);
     
     if (!template) {
       return res.status(404).json({
@@ -208,14 +194,14 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 
     // Check if template belongs to the authenticated user
-    if (template.userId !== req.user.userId) {
+    if (template.user_id !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
       });
     }
 
-    storage.deleteStylingTemplate(req.params.id);
+    await DatabaseService.deleteStylingTemplate(req.params.id);
 
     res.json({
       success: true,

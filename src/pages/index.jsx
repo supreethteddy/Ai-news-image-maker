@@ -4,6 +4,7 @@ import CreateStoryboard from "./CreateStoryboard";
 import MyStoryboards from "./MyStoryboards";
 import ViewStoryboard from "./ViewStoryboard";
 import CharacterManagement from "./CharacterManagement";
+import AdminDashboard from "./AdminDashboard";
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -15,6 +16,10 @@ const PAGES = {
     ViewStoryboard: ViewStoryboard,
     
     CharacterManagement: CharacterManagement,
+    
+    AdminDashboard: AdminDashboard,
+    
+    admin: AdminDashboard,
     
 }
 
@@ -50,6 +55,8 @@ function PagesContent() {
                 <Route path="/MyStoryboards" element={<MyStoryboards />} />
                 <Route path="/ViewStoryboard" element={<ViewStoryboard />} />
                 <Route path="/CharacterManagement" element={<CharacterManagement />} />
+                <Route path="/AdminDashboard" element={<AdminDashboard />} />
+                <Route path="/admin" element={<AdminDashboard />} />
             </Routes>
         </Layout>
     );

@@ -32,45 +32,7 @@ export const Story = {
   }
 };
 
-export const BrandProfile = {
-  async create(data) {
-    const response = await apiClient.createBrandProfile(data);
-    return response.data;
-  },
-
-  async list() {
-    const response = await apiClient.getBrandProfiles();
-    return response.data;
-  },
-
-  async update(id, data) {
-    const response = await apiClient.updateBrandProfile(id, data);
-    return response.data;
-  },
-
-  async get(id) {
-    const response = await apiClient.getBrandProfile(id);
-    return response.data;
-  },
-
-  async delete(id) {
-    await apiClient.deleteBrandProfile(id);
-  },
-
-  async getDefault() {
-    try {
-      const response = await apiClient.getDefaultBrandProfile();
-      return response.data;
-    } catch (error) {
-      return null;
-    }
-  },
-
-  async setDefault(id) {
-    const response = await apiClient.setDefaultBrandProfile(id);
-    return response.data;
-  }
-};
+// BrandProfile entity removed - using user profiles only
 
 export const User = {
   async getCurrentUser() {

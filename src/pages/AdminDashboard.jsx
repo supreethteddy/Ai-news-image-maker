@@ -159,7 +159,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -173,7 +173,7 @@ export default function AdminDashboard() {
               Needs attention
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* System Health */}

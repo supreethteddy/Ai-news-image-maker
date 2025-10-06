@@ -1,21 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Eye, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import StoryboardModal from './StoryboardModal';
 
 export default function RecentStoryboards() {
   const [storyboards, setStoryboards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedStoryboardId, setSelectedStoryboardId] = useState(null);
   const { token } = useAuth();
 
-  useEffect(() => {
-    fetchRecentStoryboards();
-  }, []);
-
-  const fetchRecentStoryboards = async () => {
+  const fetchRecentStoryboards = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/admin/content/storyboards?limit=5', {
+      const response = await fetch('http://localhost:3001/api/admin/content/storyboards', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -32,7 +31,11 @@ export default function RecentStoryboards() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchRecentStoryboards();
+  }, [fetchRecentStoryboards]);
 
   const formatTimeAgo = (dateString) => {
     const date = new Date(dateString);
@@ -78,39 +81,50 @@ export default function RecentStoryboards() {
   }
 
   return (
-    <div className="space-y-3">
-      {storyboards.map((storyboard) => (
-        <div key={storyboard.id} className="flex items-center justify-between p-3 border rounded-lg">
-          <div>
-            <p className="font-medium">"{storyboard.title}"</p>
-            <p className="text-sm text-gray-600">
-              by {storyboard.author} • {formatTimeAgo(storyboard.createdAt)}
-            </p>
+    <>
+      <div className="space-y-3">
+        {storyboards.map((storyboard) => (
+          <div key={storyboard.id} className="flex items-center justify-between p-3 border rounded-lg">
+            <div>
+              <p className="font-medium">&ldquo;{storyboard.title}&rdquo;</p>
+              <p className="text-sm text-gray-600">
+                by {storyboard.author} • {formatTimeAgo(storyboard.created_at)}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  toast.success(`Approved &ldquo;${storyboard.title}&rdquo;`);
+                  fetchRecentStoryboards();
+                }}
+              >
+                <CheckCircle className="h-4 w-4" />
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => {
+                  setSelectedStoryboardId(storyboard.id);
+                  setIsModalOpen(true);
+                }}
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              className="bg-green-600 hover:bg-green-700"
-              onClick={() => {
-                toast.success(`Approved "${storyboard.title}"`);
-                fetchRecentStoryboards();
-              }}
-            >
-              <CheckCircle className="h-4 w-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => {
-                // Open storyboard in new tab or modal
-                window.open(`/storyboard/${storyboard.id}`, '_blank');
-              }}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+      
+      <StoryboardModal 
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedStoryboardId(null);
+        }}
+        storyboardId={selectedStoryboardId}
+      />
+    </>
   );
 }

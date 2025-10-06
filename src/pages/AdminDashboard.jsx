@@ -322,7 +322,7 @@ export default function AdminDashboard() {
   );
 
   const renderContent = () => (
-    <div className="space-y-6">
+    <div className="space-y-6 max-h-screen overflow-y-auto">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Content Management</h2>
         <div className="flex gap-2">

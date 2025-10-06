@@ -2,13 +2,14 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken } from '../middleware/auth.js';
 import { checkCredits, deductCredits, addCreditBalance } from '../middleware/creditCheck.js';
+import { canAccessStoryboard } from '../middleware/adminCheck.js';
 import storage from '../storage/inMemoryStorage.js';
 import DatabaseService from '../services/databaseService.js';
 
 const router = express.Router();
 
 // Legacy route for /stories/:id (for frontend compatibility)
-router.get('/stories/:id', authenticateToken, async (req, res) => {
+router.get('/stories/:id', authenticateToken, canAccessStoryboard, async (req, res) => {
   try {
     const storyboard = await DatabaseService.getStoryboardById(req.params.id);
     
@@ -16,14 +17,6 @@ router.get('/stories/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Storyboard not found'
-      });
-    }
-
-    // Check if storyboard belongs to the authenticated user
-    if (storyboard.user_id !== req.user.userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
       });
     }
 
@@ -44,8 +37,8 @@ router.get('/stories/:id', authenticateToken, async (req, res) => {
         });
       }
 
-      // Check if storyboard belongs to the authenticated user
-      if (storyboard.userId !== req.user.userId) {
+      // For fallback, still check ownership for non-admin users
+      if (req.user.role !== 'admin' && storyboard.userId !== req.user.userId) {
         return res.status(403).json({
           success: false,
           message: 'Access denied'
@@ -99,7 +92,7 @@ router.get('/', authenticateToken, addCreditBalance, async (req, res) => {
 });
 
 // Get a specific storyboard by ID
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', authenticateToken, canAccessStoryboard, async (req, res) => {
   try {
     const storyboard = await DatabaseService.getStoryboardById(req.params.id);
     
@@ -107,14 +100,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Storyboard not found'
-      });
-    }
-
-    // Check if storyboard belongs to the authenticated user
-    if (storyboard.user_id !== req.user.userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
       });
     }
 
@@ -135,8 +120,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
         });
       }
 
-      // Check if storyboard belongs to the authenticated user
-      if (storyboard.userId !== req.user.userId) {
+      // For fallback, still check ownership for non-admin users
+      if (req.user.role !== 'admin' && storyboard.userId !== req.user.userId) {
         return res.status(403).json({
           success: false,
           message: 'Access denied'

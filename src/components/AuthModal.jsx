@@ -1,51 +1,60 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  X, 
-  Mail, 
-  Lock, 
-  User, 
-  Eye, 
+import { useState } from "react";
+import PropTypes from "prop-types";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  X,
+  Mail,
+  Lock,
+  User,
+  Eye,
   EyeOff,
   Sparkles,
   CheckCircle,
-  AlertCircle
-} from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+  AlertCircle,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const AuthModal = ({ isOpen, onClose }) => {
   const { login, register } = useAuth();
-  const [activeTab, setActiveTab] = useState('login');
+  const [activeTab, setActiveTab] = useState("login");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
-  const [confirmationEmail, setConfirmationEmail] = useState('');
+  const [confirmationEmail, setConfirmationEmail] = useState("");
+  const [showFlaggedWarning, setShowFlaggedWarning] = useState(false);
+  const [flaggedReason, setFlaggedReason] = useState("");
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
   const [errors, setErrors] = useState({});
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     // Clear error when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        [name]: ''
+        [name]: "",
       }));
     }
   };
@@ -54,26 +63,26 @@ const AuthModal = ({ isOpen, onClose }) => {
     const newErrors = {};
 
     if (isSignup && !formData.name.trim()) {
-      newErrors.name = 'Name is required';
+      newErrors.name = "Name is required";
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+      newErrors.email = "Email is invalid";
     }
 
     if (!formData.password) {
-      newErrors.password = 'Password is required';
+      newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      newErrors.password = "Password must be at least 6 characters";
     }
 
     if (isSignup) {
       if (!formData.confirmPassword) {
-        newErrors.confirmPassword = 'Please confirm your password';
+        newErrors.confirmPassword = "Please confirm your password";
       } else if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match';
+        newErrors.confirmPassword = "Passwords do not match";
       }
     }
 
@@ -89,25 +98,34 @@ const AuthModal = ({ isOpen, onClose }) => {
     try {
       const result = await login(formData.email, formData.password);
       if (result.success) {
-        toast.success('Welcome back!');
-        onClose();
+        // Check if user is flagged
+        if (result.user.user.is_flagged) {
+          setShowFlaggedWarning(true);
+          setFlaggedReason(result.user.flag_reason || "No reason provided");
+          toast.error("Your account has been flagged by an administrator.");
+          return; // Don't close modal or redirect
+        }
         
+        toast.success("Welcome back!");
+        onClose();
         // Redirect based on user role
-        if (result.user && result.user.role === 'admin') {
-          window.location.href = '/admin';
+        if (result.user.user && result.user.user.role === "admin") {
+          window.location.href = "/admin";
         } else {
-          window.location.href = '/CreateStoryboard';
+          window.location.href = "/CreateStoryboard";
         }
       } else {
         // Check if it's an email confirmation error
-        if (result.message && result.message.includes('confirmation link')) {
-          toast.error('Please check your email and click the confirmation link before logging in.');
+        if (result.message && result.message.includes("confirmation link")) {
+          toast.error(
+            "Please check your email and click the confirmation link before logging in."
+          );
         } else {
-          toast.error(result.message || 'Login failed');
+          toast.error(result.message);
         }
       }
-    } catch (error) {
-      toast.error('An error occurred during login');
+    } catch {
+      toast.error("An error occurred during login");
     } finally {
       setLoading(false);
     }
@@ -119,24 +137,30 @@ const AuthModal = ({ isOpen, onClose }) => {
 
     setLoading(true);
     try {
-      const result = await register(formData.name, formData.email, formData.password);
+      const result = await register(
+        formData.name,
+        formData.email,
+        formData.password
+      );
       if (result.success) {
         // Check if email confirmation is required
-        if (result.message && result.message.includes('check your email')) {
+        if (result.message && result.message.includes("check your email")) {
           setEmailConfirmationSent(true);
           setConfirmationEmail(formData.email);
-          toast.success('Registration successful! Please check your email for confirmation.');
+          toast.success(
+            "Registration successful! Please check your email for confirmation."
+          );
         } else {
-          toast.success('Account created successfully!');
+          toast.success("Account created successfully!");
           onClose();
           // Redirect to dashboard
-          window.location.href = '/CreateStoryboard';
+          window.location.href = "/CreateStoryboard";
         }
       } else {
-        toast.error(result.message || 'Registration failed');
+        toast.error(result.message || "Registration failed");
       }
-    } catch (error) {
-      toast.error('An error occurred during registration');
+    } catch {
+      toast.error("An error occurred during registration");
     } finally {
       setLoading(false);
     }
@@ -144,16 +168,18 @@ const AuthModal = ({ isOpen, onClose }) => {
 
   const handleClose = () => {
     setFormData({
-      name: '',
-      email: '',
-      password: '',
-      confirmPassword: ''
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
     });
     setErrors({});
-    setActiveTab('login');
+    setActiveTab("login");
     setShowPassword(false);
     setEmailConfirmationSent(false);
-    setConfirmationEmail('');
+    setConfirmationEmail("");
+    setShowFlaggedWarning(false);
+    setFlaggedReason("");
     onClose();
   };
 
@@ -191,11 +217,14 @@ const AuthModal = ({ isOpen, onClose }) => {
                 <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-xl font-bold text-slate-900">NewsPlay</span>
+                <span className="text-xl font-bold text-slate-900">
+                  NewsPlay
+                </span>
               </div>
               <CardTitle className="text-2xl">Welcome to NewsPlay</CardTitle>
               <CardDescription>
-                Sign in to your account or create a new one to start creating amazing storyboards
+                Sign in to your account or create a new one to start creating
+                amazing storyboards
               </CardDescription>
             </CardHeader>
 
@@ -204,14 +233,64 @@ const AuthModal = ({ isOpen, onClose }) => {
                 <Alert className="mb-6 border-green-200 bg-green-50">
                   <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-800">
-                    <strong>Email confirmation sent!</strong><br />
-                    We've sent a confirmation link to <strong>{confirmationEmail}</strong>. 
-                    Please check your inbox and click the link to activate your account.
+                    <strong>Email confirmation sent!</strong>
+                    <br />
+                    We&apos;ve sent a confirmation link to{" "}
+                    <strong>{confirmationEmail}</strong>. Please check your
+                    inbox and click the link to activate your account.
                   </AlertDescription>
                 </Alert>
               )}
-              
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+
+              {showFlaggedWarning && (
+                <Alert className="mb-6 border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    <strong>Account Flagged</strong>
+                    <br />
+                    Your account has been flagged by an administrator. Please contact support for more information.
+                    {flaggedReason && (
+                      <>
+                        <br />
+                        <br />
+                        <strong>Reason:</strong> {flaggedReason}
+                      </>
+                    )}
+                    <br />
+                    <br />
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-red-300 text-red-700 hover:bg-red-100"
+                        onClick={() => {
+                          // You can implement contact support functionality here
+                          window.open('mailto:support@newsplay.com?subject=Account Flagged - Support Request', '_blank');
+                        }}
+                      >
+                        Contact Support
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:bg-red-100"
+                        onClick={() => {
+                          setShowFlaggedWarning(false);
+                          setFlaggedReason("");
+                        }}
+                      >
+                        Dismiss
+                      </Button>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full"
+              >
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="login">Sign In</TabsTrigger>
                   <TabsTrigger value="register">Sign Up</TabsTrigger>
@@ -230,7 +309,9 @@ const AuthModal = ({ isOpen, onClose }) => {
                           placeholder="Enter your email"
                           value={formData.email}
                           onChange={handleInputChange}
-                          className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
+                          className={`pl-10 ${
+                            errors.email ? "border-red-500" : ""
+                          }`}
                           disabled={loading}
                         />
                       </div>
@@ -251,11 +332,13 @@ const AuthModal = ({ isOpen, onClose }) => {
                         <Input
                           id="login-password"
                           name="password"
-                          type={showPassword ? 'text' : 'password'}
+                          type={showPassword ? "text" : "password"}
                           placeholder="Enter your password"
                           value={formData.password}
                           onChange={handleInputChange}
-                          className={`pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
+                          className={`pl-10 pr-10 ${
+                            errors.password ? "border-red-500" : ""
+                          }`}
                           disabled={loading}
                         />
                         <Button
@@ -288,7 +371,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                       className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                       disabled={loading}
                     >
-                      {loading ? 'Signing In...' : 'Sign In'}
+                      {loading ? "Signing In..." : "Sign In"}
                     </Button>
                   </form>
                 </TabsContent>
@@ -306,7 +389,9 @@ const AuthModal = ({ isOpen, onClose }) => {
                           placeholder="Enter your full name"
                           value={formData.name}
                           onChange={handleInputChange}
-                          className={`pl-10 ${errors.name ? 'border-red-500' : ''}`}
+                          className={`pl-10 ${
+                            errors.name ? "border-red-500" : ""
+                          }`}
                           disabled={loading}
                         />
                       </div>
@@ -331,7 +416,9 @@ const AuthModal = ({ isOpen, onClose }) => {
                           placeholder="Enter your email"
                           value={formData.email}
                           onChange={handleInputChange}
-                          className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
+                          className={`pl-10 ${
+                            errors.email ? "border-red-500" : ""
+                          }`}
                           disabled={loading}
                         />
                       </div>
@@ -352,11 +439,13 @@ const AuthModal = ({ isOpen, onClose }) => {
                         <Input
                           id="register-password"
                           name="password"
-                          type={showPassword ? 'text' : 'password'}
+                          type={showPassword ? "text" : "password"}
                           placeholder="Create a password"
                           value={formData.password}
                           onChange={handleInputChange}
-                          className={`pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
+                          className={`pl-10 pr-10 ${
+                            errors.password ? "border-red-500" : ""
+                          }`}
                           disabled={loading}
                         />
                         <Button
@@ -385,17 +474,21 @@ const AuthModal = ({ isOpen, onClose }) => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="register-confirm-password">Confirm Password</Label>
+                      <Label htmlFor="register-confirm-password">
+                        Confirm Password
+                      </Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                         <Input
                           id="register-confirm-password"
                           name="confirmPassword"
-                          type={showPassword ? 'text' : 'password'}
+                          type={showPassword ? "text" : "password"}
                           placeholder="Confirm your password"
                           value={formData.confirmPassword}
                           onChange={handleInputChange}
-                          className={`pl-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                          className={`pl-10 ${
+                            errors.confirmPassword ? "border-red-500" : ""
+                          }`}
                           disabled={loading}
                         />
                       </div>
@@ -414,7 +507,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                       className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                       disabled={loading}
                     >
-                      {loading ? 'Creating Account...' : 'Create Account'}
+                      {loading ? "Creating Account..." : "Create Account"}
                     </Button>
                   </form>
                 </TabsContent>
@@ -422,11 +515,11 @@ const AuthModal = ({ isOpen, onClose }) => {
 
               <div className="mt-6 text-center">
                 <p className="text-sm text-slate-600">
-                  By signing up, you agree to our{' '}
+                  By signing up, you agree to our{" "}
                   <a href="#" className="text-blue-600 hover:underline">
                     Terms of Service
-                  </a>{' '}
-                  and{' '}
+                  </a>{" "}
+                  and{" "}
                   <a href="#" className="text-blue-600 hover:underline">
                     Privacy Policy
                   </a>
@@ -438,6 +531,11 @@ const AuthModal = ({ isOpen, onClose }) => {
       </motion.div>
     </AnimatePresence>
   );
+};
+
+AuthModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
 };
 
 export default AuthModal;

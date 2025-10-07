@@ -220,7 +220,9 @@ router.post('/login', [
               name: profile?.name || data.user.user_metadata?.name || 'User',
               role: profile?.role || 'user',
               created_at: data.user.created_at,
-              email_confirmed: data.user.email_confirmed_at ? true : false
+              email_confirmed: data.user.email_confirmed_at ? true : false,
+              is_flagged: profile?.is_flagged || false,
+              flag_reason: profile?.flag_reason || null
             },
             token: token
           },
@@ -308,7 +310,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
               lastName: profile.last_name,
               name: profile.name,
               role: profile.role,
-              credits: profile.credits || 0
+              credits: profile.credits || 0,
+              is_flagged: profile.is_flagged || false,
+              flag_reason: profile.flag_reason || null
             }
           }
         });

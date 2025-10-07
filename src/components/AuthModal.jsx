@@ -36,6 +36,8 @@ const AuthModal = ({ isOpen, onClose }) => {
   const [confirmationEmail, setConfirmationEmail] = useState("");
   const [showFlaggedWarning, setShowFlaggedWarning] = useState(false);
   const [flaggedReason, setFlaggedReason] = useState("");
+  const [showFlaggedDialog, setShowFlaggedDialog] = useState(false);
+  const [loginResult, setLoginResult] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -100,10 +102,10 @@ const AuthModal = ({ isOpen, onClose }) => {
       if (result.success) {
         // Check if user is flagged
         if (result.user.user.is_flagged) {
-          setShowFlaggedWarning(true);
-          setFlaggedReason(result.user.flag_reason || "No reason provided");
-          toast.error("Your account has been flagged by an administrator.");
-          return; // Don't close modal or redirect
+          setLoginResult(result);
+          setShowFlaggedDialog(true);
+          setFlaggedReason(result.user.user.flag_reason || "No reason provided");
+          return; // Show dialog first, don't proceed yet
         }
         
         toast.success("Welcome back!");
@@ -166,6 +168,18 @@ const AuthModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleFlaggedContinue = () => {
+    setShowFlaggedDialog(false);
+    toast.success("Welcome back!");
+    onClose();
+    // Redirect based on user role
+    if (loginResult?.user?.user?.role === "admin") {
+      window.location.href = "/admin";
+    } else {
+      window.location.href = "/CreateStoryboard";
+    }
+  };
+
   const handleClose = () => {
     setFormData({
       name: "",
@@ -180,6 +194,8 @@ const AuthModal = ({ isOpen, onClose }) => {
     setConfirmationEmail("");
     setShowFlaggedWarning(false);
     setFlaggedReason("");
+    setShowFlaggedDialog(false);
+    setLoginResult(null);
     onClose();
   };
 
@@ -528,6 +544,70 @@ const AuthModal = ({ isOpen, onClose }) => {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Flagged User Dialog */}
+        {showFlaggedDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowFlaggedDialog(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Card className="relative">
+                <CardHeader className="text-center pb-6">
+                  <div className="flex items-center justify-center mb-4">
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                      <AlertCircle className="w-6 h-6 text-red-600" />
+                    </div>
+                  </div>
+                  <CardTitle className="text-xl text-red-900">Account Flagged</CardTitle>
+                  <CardDescription className="text-red-700">
+                    Your account has been flagged by an administrator.
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <AlertDescription className="text-red-800">
+                      <strong>Flag Reason:</strong> {flaggedReason}
+                      <br />
+                      <br />
+                      You can still continue to use the platform, but please be aware of this status.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-red-300 text-red-700 hover:bg-red-100"
+                      onClick={() => {
+                        window.open('mailto:support@newsplay.com?subject=Account Flagged - Support Request', '_blank');
+                      }}
+                    >
+                      Contact Support
+                    </Button>
+                    <Button
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      onClick={handleFlaggedContinue}
+                    >
+                      Continue Anyway
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
       </motion.div>
     </AnimatePresence>
   );

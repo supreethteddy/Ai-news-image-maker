@@ -1,23 +1,31 @@
 // Vercel serverless function for all API routes
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 // Create Express app
 const app = express();
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cors({
   origin: true,
   credentials: true
 }));
 
-// Import your existing backend app
-const backendApp = require('../backend/src/app.js');
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV 
+  });
+});
 
-// Use the backend app
-app.use('/', backendApp);
+// Use simplified routes
+const routes = require('./routes.js');
+app.use('/api', routes);
 
 // Export for Vercel
 module.exports = app;

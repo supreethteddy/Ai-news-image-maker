@@ -30,9 +30,17 @@ const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet());
+
+// CORS configuration
+const defaultAllowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+const envFrontendUrl = process.env.FRONTEND_URL || 'https://ai-news-image-maker.vercel.app';
+const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, envFrontendUrl]));
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Rate limiting

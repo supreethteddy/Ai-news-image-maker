@@ -25,7 +25,7 @@ const CharacterManagement = () => {
 
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/characters', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/characters', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -65,7 +65,7 @@ const CharacterManagement = () => {
     
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/characters/${characterId}`, {
+      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/characters/${characterId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -96,7 +96,7 @@ const CharacterManagement = () => {
   const handleDownloadImage = async (character) => {
     try {
       // Use backend proxy to avoid CORS issues
-      const response = await fetch(`http://localhost:3001/api/characters/${character.id}/download`, {
+      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/characters/${character.id}/download`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

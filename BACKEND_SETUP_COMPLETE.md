@@ -72,9 +72,9 @@ RUNWARE_API_KEY=your_runware_api_key_here
 ## 🌐 Access Points
 
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3001
-- **Health Check**: http://localhost:3001/health
-- **API Docs**: http://localhost:3001/
+- **Backend API**: https://ai-news-image-maker.onrender.com
+- **Health Check**: https://ai-news-image-maker.onrender.com/health
+- **API Docs**: https://ai-news-image-maker.onrender.com/
 
 ## 🎯 Key Features Working
 

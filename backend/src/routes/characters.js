@@ -328,8 +328,8 @@ router.post('/generate-image', authenticateToken, [
           const fileData = await fs.readFile(absolutePath);
           characterReferenceBuffer = Buffer.from(fileData);
           console.log('Character reference image loaded from disk successfully');
-        } else if (imageUrl.startsWith('http://localhost:3001/uploads/')) {
-          const relativePath = imageUrl.replace('http://localhost:3001/uploads/', '');
+        } else if (imageUrl.startsWith('https://ai-news-image-maker.onrender.com/uploads/')) {
+          const relativePath = imageUrl.replace('https://ai-news-image-maker.onrender.com/uploads/', '');
           const absolutePath = path.join(__dirname, '../../uploads', relativePath);
           console.log('Reading character reference image from disk:', absolutePath);
           const fileData = await fs.readFile(absolutePath);

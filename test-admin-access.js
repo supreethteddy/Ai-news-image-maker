@@ -3,7 +3,7 @@
 
 import fetch from 'node-fetch';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = 'https://ai-news-image-maker.onrender.com/api';
 const ADMIN_EMAIL = 'admin@newsplaystudio.com';
 const ADMIN_PASSWORD = 'qweqwe';
 

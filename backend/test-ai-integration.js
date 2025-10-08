@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'https://ai-news-image-maker.onrender.com/api';
 
 // Test data
 const testArticle = `
@@ -181,7 +181,7 @@ async function main() {
   
   // Check if backend is running
   try {
-    await axios.get('http://localhost:3001/health');
+    await axios.get('https://ai-news-image-maker.onrender.com/health');
     console.log('✅ Backend server is running\n');
   } catch (error) {
     console.log('❌ Backend server is not running. Please start it first.');

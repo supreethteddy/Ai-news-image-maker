@@ -242,8 +242,8 @@ export class IdeogramService {
               const absolutePath = path.join(__dirname, '../../uploads', relativePath);
               const fileData = await fs.readFile(absolutePath);
               buffer = Buffer.from(fileData);
-            } else if (typeof imageUrl === 'string' && imageUrl.startsWith('http://localhost:3001/uploads/')) {
-              const relativePath = imageUrl.replace('http://localhost:3001/uploads/', '');
+            } else if (typeof imageUrl === 'string' && imageUrl.startsWith('https://ai-news-image-maker.onrender.com/uploads/')) {
+              const relativePath = imageUrl.replace('https://ai-news-image-maker.onrender.com/uploads/', '');
               const absolutePath = path.join(__dirname, '../../uploads', relativePath);
               const fileData = await fs.readFile(absolutePath);
               buffer = Buffer.from(fileData);

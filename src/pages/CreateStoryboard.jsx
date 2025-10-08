@@ -184,7 +184,7 @@ export default function CreateStoryboard() {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/storyboards', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/storyboards', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

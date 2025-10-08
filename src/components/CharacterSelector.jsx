@@ -22,7 +22,7 @@ const CharacterSelector = ({ selectedCharacter, onCharacterSelect, onCharacterCh
 
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/characters', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/characters', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

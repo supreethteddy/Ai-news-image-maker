@@ -48,7 +48,7 @@ const UserManagement = () => {
       if (searchTerm) params.append('search', searchTerm);
       if (statusFilter !== 'all') params.append('status', statusFilter);
       
-      const response = await fetch(`http://localhost:3001/api/admin/users?${params}`, {
+      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/admin/users?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -71,7 +71,7 @@ const UserManagement = () => {
   // Fetch detailed user profile
   const fetchUserDetails = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/users/${userId}`, {
+      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/admin/users/${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -121,7 +121,7 @@ const UserManagement = () => {
           break;
       }
 
-      const response = await fetch(`http://localhost:3001${endpoint}`, {
+      const response = await fetch(`https://ai-news-image-maker.onrender.com${endpoint}`, {
         method,
         headers: {
           'Content-Type': 'application/json',

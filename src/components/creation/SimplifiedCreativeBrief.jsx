@@ -73,7 +73,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
     if (!isAuthenticated || !token) return;
 
     try {
-      const response = await fetch('http://localhost:3001/api/styling-templates', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/styling-templates', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -101,7 +101,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await fetch('http://localhost:3001/api/upload/logo', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/upload/logo', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -138,7 +138,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
 
     setSaving(true);
     try {
-      const response = await fetch('http://localhost:3001/api/styling-templates', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/styling-templates', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
     if (!isAuthenticated || !token) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/styling-templates/${template.id}`, {
+      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/styling-templates/${template.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -32,7 +32,7 @@ export default function MyStoryboards() {
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/storyboards', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/storyboards', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -65,7 +65,7 @@ export default function MyStoryboards() {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/storyboards/${storyboardId}`, {
+      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/storyboards/${storyboardId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

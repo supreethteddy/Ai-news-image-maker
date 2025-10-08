@@ -169,7 +169,7 @@ NODE_ENV=development npm run dev
 
 ### **API Status Check**
 ```bash
-curl http://localhost:3001/api/ai/test-connection
+curl https://ai-news-image-maker.onrender.com/api/ai/test-connection
 ```
 
 ## 📊 Performance Tips

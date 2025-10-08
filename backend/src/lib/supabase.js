@@ -106,9 +106,6 @@ export const db = {
     },
 
     getById: async (id) => {
-      if (!supabase) {
-        return { data: null, error: null }
-      }
       const { data, error } = await supabase
         .from('storyboards')
         .select('*')
@@ -118,9 +115,6 @@ export const db = {
     },
 
     create: async (storyboardData) => {
-      if (!supabase) {
-        return { data: { id: Date.now(), ...storyboardData }, error: null }
-      }
       const { data, error } = await supabase
         .from('storyboards')
         .insert([storyboardData])
@@ -130,9 +124,6 @@ export const db = {
     },
 
     update: async (id, updates) => {
-      if (!supabase) {
-        return { data: { id, ...updates }, error: null }
-      }
       const { data, error } = await supabase
         .from('storyboards')
         .update(updates)
@@ -143,9 +134,6 @@ export const db = {
     },
 
     delete: async (id) => {
-      if (!supabase) {
-        return { error: null }
-      }
       const { error } = await supabase
         .from('storyboards')
         .delete()
@@ -157,9 +145,6 @@ export const db = {
   // Styling Templates
   stylingTemplates: {
     getAll: async (userId) => {
-      if (!supabase) {
-        return { data: [], error: null }
-      }
       const { data, error } = await supabase
         .from('styling_templates')
         .select('*')
@@ -169,9 +154,6 @@ export const db = {
     },
 
     getById: async (id) => {
-      if (!supabase) {
-        return { data: null, error: null }
-      }
       const { data, error } = await supabase
         .from('styling_templates')
         .select('*')
@@ -181,9 +163,6 @@ export const db = {
     },
 
     create: async (templateData) => {
-      if (!supabase) {
-        return { data: { id: Date.now(), ...templateData }, error: null }
-      }
       const { data, error } = await supabase
         .from('styling_templates')
         .insert([templateData])
@@ -193,9 +172,6 @@ export const db = {
     },
 
     update: async (id, updates) => {
-      if (!supabase) {
-        return { data: { id, ...updates }, error: null }
-      }
       const { data, error } = await supabase
         .from('styling_templates')
         .update(updates)
@@ -206,9 +182,6 @@ export const db = {
     },
 
     delete: async (id) => {
-      if (!supabase) {
-        return { error: null }
-      }
       const { error } = await supabase
         .from('styling_templates')
         .delete()
@@ -222,9 +195,6 @@ export const db = {
 export const auth = {
   // Verify JWT token from Supabase
   verifyToken: async (token) => {
-    if (!supabase) {
-      return { user: { id: 'dev-user', email: 'dev@example.com' }, error: null }
-    }
     try {
       const { data: { user }, error } = await supabase.auth.getUser(token)
       if (error) throw error

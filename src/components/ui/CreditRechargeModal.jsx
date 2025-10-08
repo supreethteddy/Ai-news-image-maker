@@ -29,7 +29,7 @@ const CreditRechargeModal = ({ isOpen, onClose, onSuccess }) => {
   const fetchPackages = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/credits/packages');
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/credits/packages');
       
       if (response.ok) {
         const data = await response.json();
@@ -54,7 +54,7 @@ const CreditRechargeModal = ({ isOpen, onClose, onSuccess }) => {
 
     try {
       setPurchasing(true);
-      const response = await fetch('http://localhost:3001/api/credits/purchase', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/credits/purchase', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

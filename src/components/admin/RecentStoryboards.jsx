@@ -14,7 +14,7 @@ export default function RecentStoryboards() {
 
   const fetchRecentStoryboards = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/admin/content/storyboards', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/admin/content/storyboards', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

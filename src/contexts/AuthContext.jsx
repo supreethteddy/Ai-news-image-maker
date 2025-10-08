@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
           console.log('🔍 Found stored token, fetching user profile from database...');
           
           // Fetch user profile from database using the token
-          const response = await fetch('http://localhost:3001/api/auth/profile', {
+          const response = await fetch('https://ai-news-image-maker.onrender.com/api/auth/profile', {
             headers: {
               'Authorization': `Bearer ${storedToken}`
             }
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       console.log('Attempting login with backend API:', email);
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +120,7 @@ export const AuthProvider = ({ children }) => {
         
         // Fetch fresh user profile from database
         console.log('🔄 Fetching user profile from database...');
-        const profileResponse = await fetch('http://localhost:3001/api/auth/profile', {
+        const profileResponse = await fetch('https://ai-news-image-maker.onrender.com/api/auth/profile', {
           headers: {
             'Authorization': `Bearer ${data.data.token}`
           }
@@ -161,7 +161,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password) => {
     try {
       console.log('Attempting registration with backend API:', email);
-      const response = await fetch('http://localhost:3001/api/auth/register', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,7 +222,7 @@ export const AuthProvider = ({ children }) => {
     if (!token) return;
     
     try {
-      const response = await fetch('http://localhost:3001/api/credits/balance', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/credits/balance', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -1,5 +1,5 @@
 // API Client for NewsPlay Backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://ai-news-image-maker.onrender.com/api';
 const TOKEN_KEY = 'supabase_token';
 
 class ApiClient {

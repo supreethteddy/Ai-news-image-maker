@@ -48,7 +48,7 @@ A robust Node.js backend API for the NewsPlay AI-powered visual storytelling pla
    npm run dev
    ```
 
-The API will be available at `http://localhost:3001`
+The API will be available at `https://ai-news-image-maker.onrender.com`
 
 ## 📚 API Endpoints
 
@@ -135,7 +135,7 @@ Authorization: Bearer your_jwt_token_here
 
 ### Create a Story
 ```bash
-curl -X POST http://localhost:3001/api/stories \
+curl -X POST https://ai-news-image-maker.onrender.com/api/stories \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_jwt_token" \
   -d '{
@@ -147,7 +147,7 @@ curl -X POST http://localhost:3001/api/stories \
 
 ### Generate Image
 ```bash
-curl -X POST http://localhost:3001/api/ai/generate-image \
+curl -X POST https://ai-news-image-maker.onrender.com/api/ai/generate-image \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "A bustling modern city street with dramatic lighting",

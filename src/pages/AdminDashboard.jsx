@@ -59,7 +59,7 @@ export default function AdminDashboard() {
     console.log('👤 User:', user);
     
     try {
-      const response = await fetch('http://localhost:3001/api/admin/dashboard', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/admin/dashboard', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

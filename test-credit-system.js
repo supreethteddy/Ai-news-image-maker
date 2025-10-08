@@ -1,7 +1,7 @@
 // Test script for credit system
 const fetch = require('node-fetch');
 
-const BASE_URL = 'http://localhost:3001/api';
+const BASE_URL = 'https://ai-news-image-maker.onrender.com/api';
 
 async function testCreditSystem() {
   console.log('🧪 Testing Credit System...\n');

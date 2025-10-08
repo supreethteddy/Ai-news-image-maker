@@ -38,7 +38,7 @@ const CreditManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/admin/users', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/admin/users', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -62,7 +62,7 @@ const CreditManagement = () => {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/credits/admin/transactions', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/credits/admin/transactions', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -86,7 +86,7 @@ const CreditManagement = () => {
   const fetchPurchases = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/credits/admin/purchases', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/credits/admin/purchases', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -114,7 +114,7 @@ const CreditManagement = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/credits/add', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/credits/add', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

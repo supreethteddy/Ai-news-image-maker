@@ -307,7 +307,7 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
     try {
       // If authenticated, use backend proxy for download
       if (isAuthenticated && token && storyboard.id && !storyboard.id.startsWith('local_')) {
-        const response = await fetch(`http://localhost:3001/api/storyboards/${storyboard.id}/images/${partIndex}/download`, {
+        const response = await fetch(`https://ai-news-image-maker.onrender.com/api/storyboards/${storyboard.id}/images/${partIndex}/download`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

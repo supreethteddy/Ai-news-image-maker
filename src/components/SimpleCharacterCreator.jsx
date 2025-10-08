@@ -96,7 +96,7 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
     uploadFormData.append('image', formData.imageFile);
 
     try {
-      const response = await fetch('http://localhost:3001/api/upload/character-image', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/upload/character-image', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -147,7 +147,7 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
       };
       console.log('Request data:', requestData);
 
-      const response = await fetch('http://localhost:3001/api/characters/generate-image', {
+      const response = await fetch('https://ai-news-image-maker.onrender.com/api/characters/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

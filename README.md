@@ -86,7 +86,7 @@ NewsPlay is an innovative AI-powered application that transforms text articles i
 
 6. **Access the application**
    - Frontend: http://localhost:5173
-   - Backend API: http://localhost:3001
+   - Backend API: https://ai-news-image-maker.onrender.com
 
 ## 🎯 Usage
 

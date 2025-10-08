@@ -7,7 +7,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 let supabase = null
 
 try {
-  if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'https://your-project.supabase.co') {
+  if (supabaseUrl && supabaseAnonKey && supabaseUrl !== '') {
     supabase = createClient(supabaseUrl, supabaseAnonKey)
   } else {
     console.log('⚠️  Supabase not configured - running in development mode without database')

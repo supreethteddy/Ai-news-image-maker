@@ -654,7 +654,7 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
                       <motion.img
                         src={part.image_url}
                         alt={`Visual for ${part.section_title || `Section ${index + 1}`}`}
-                        className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
+                        className="w-full h-full object-cover object-right-bottom transition-transform duration-700 hover:scale-110"
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.8 }}

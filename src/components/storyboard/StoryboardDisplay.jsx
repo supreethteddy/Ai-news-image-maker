@@ -630,6 +630,20 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
 
                 {/* Image Section */}
                 <div className={`relative min-h-[250px] md:min-h-[300px] lg:min-h-[400px] bg-slate-100 flex items-center justify-center overflow-hidden ${index % 2 === 0 ? 'order-1 lg:order-2' : 'order-1 lg:order-1'}`}>
+                  {/* Logo overlay - ALWAYS on bottom right of card container */}
+                  {storyboard?.logoUrl && part.image_url && (
+                    <div className="absolute bottom-3 right-3 pointer-events-none z-20">
+                      <img 
+                        src={storyboard.logoUrl} 
+                        alt="Brand logo" 
+                        className="h-8 md:h-10 lg:h-12 w-auto object-contain opacity-95"
+                        style={{
+                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'
+                        }}
+                      />
+                    </div>
+                  )}
+                  
                   {regeneratingIndex === index ? (
                     <div className="flex flex-col items-center text-slate-400">
                       <Loader2 className="w-8 md:w-10 h-8 md:h-10 animate-spin mb-2 md:mb-3" />

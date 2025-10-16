@@ -31,6 +31,7 @@ import UserManagement from '@/components/admin/UserManagement';
 import ContentManagement from '@/components/admin/ContentManagement';
 import SystemMonitoring from '@/components/admin/SystemMonitoring';
 import RecentStoryboards from '@/components/admin/RecentStoryboards';
+import apiClient from '@/api/client';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -59,9 +60,9 @@ export default function AdminDashboard() {
     console.log('👤 User:', user);
     
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/admin/dashboard', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/admin/dashboard`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
       
@@ -104,7 +105,8 @@ export default function AdminDashboard() {
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'content', label: 'Content Management', icon: FileText },
     { id: 'credits', label: 'Credit Management', icon: Coins },
-    { id: 'monitoring', label: 'System Monitoring', icon: Activity }
+    { id: 'monitoring', label: 'System Monitoring', icon: Activity },
+    { id: 'branding', label: 'Branding', icon: Settings }
   ];
 
   const renderOverview = () => (
@@ -491,6 +493,97 @@ export default function AdminDashboard() {
     </div>
   );
 
+  function BrandingSettings() {
+    const [form, setForm] = useState({
+      brandName: '',
+      logoUrl: '',
+      iconUrl: '',
+      poweredByUrl: '',
+      footerText: '',
+      primaryFrom: '',
+      primaryTo: ''
+    });
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+      (async () => {
+        try {
+          const res = await apiClient.getBranding();
+          if (res?.success && res.data) {
+            setForm(prev => ({ ...prev, ...res.data }));
+          }
+        } catch (e) {
+          console.error('Failed to load branding', e);
+        }
+      })();
+    }, []);
+
+    const updateField = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+    const onSave = async () => {
+      setSaving(true);
+      try {
+        const res = await apiClient.updateBranding(form);
+        if (res?.success) {
+          toast.success('Branding updated');
+        } else {
+          toast.error('Failed to update branding');
+        }
+      } catch (e) {
+        console.error(e);
+        toast.error('Error updating branding');
+      }
+      setSaving(false);
+    };
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Branding</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-gray-600">Brand Name</label>
+                <input className="mt-1 w-full border rounded px-3 py-2" value={form.brandName} onChange={updateField('brandName')} />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">Logo URL</label>
+                <input className="mt-1 w-full border rounded px-3 py-2" value={form.logoUrl} onChange={updateField('logoUrl')} />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">Icon URL</label>
+                <input className="mt-1 w-full border rounded px-3 py-2" value={form.iconUrl} onChange={updateField('iconUrl')} />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">Powered By URL</label>
+                <input className="mt-1 w-full border rounded px-3 py-2" value={form.poweredByUrl} onChange={updateField('poweredByUrl')} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm text-gray-600">Footer Text</label>
+                <input className="mt-1 w-full border rounded px-3 py-2" value={form.footerText} onChange={updateField('footerText')} />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">Primary Gradient From</label>
+                <input className="mt-1 w-full border rounded px-3 py-2" value={form.primaryFrom} onChange={updateField('primaryFrom')} placeholder="#2563eb" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600">Primary Gradient To</label>
+                <input className="mt-1 w-full border rounded px-3 py-2" value={form.primaryTo} onChange={updateField('primaryTo')} placeholder="#7c3aed" />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={onSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+                {saving ? 'Saving…' : 'Save Branding'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -567,6 +660,7 @@ export default function AdminDashboard() {
             {activeTab === 'content' && renderContent()}
             {activeTab === 'credits' && <CreditManagement />}
             {activeTab === 'monitoring' && renderMonitoring()}
+            {activeTab === 'branding' && <BrandingSettings />}
           </motion.div>
         </AnimatePresence>
       </div>

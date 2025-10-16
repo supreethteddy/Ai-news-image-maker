@@ -7,6 +7,16 @@ class InMemoryStorage {
     this.characters = new Map();
     this.storyboards = new Map();
     this.stylingTemplates = new Map();
+    // Simple site-wide branding settings (admin editable)
+    this.branding = {
+      brandName: 'NewsPlay',
+      logoUrl: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png',
+      iconUrl: '',
+      poweredByUrl: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png',
+      footerText: 'Transform any text into captivating visual storyboards using AI.',
+      primaryFrom: '#2563eb',
+      primaryTo: '#7c3aed'
+    };
     this.nextId = 1;
   }
 
@@ -264,6 +274,19 @@ class InMemoryStorage {
     return Array.from(this.stylingTemplates.values())
       .filter(template => template.userId === userId)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  // Branding operations
+  getBranding() {
+    return this.branding;
+  }
+
+  updateBranding(updates) {
+    this.branding = {
+      ...this.branding,
+      ...updates
+    };
+    return this.branding;
   }
 
   // Utility methods

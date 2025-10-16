@@ -48,9 +48,9 @@ const UserManagement = () => {
       if (searchTerm) params.append('search', searchTerm);
       if (statusFilter !== 'all') params.append('status', statusFilter);
       
-      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/admin/users?${params}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/admin/users?${params}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 
@@ -71,9 +71,9 @@ const UserManagement = () => {
   // Fetch detailed user profile
   const fetchUserDetails = async (userId) => {
     try {
-      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/admin/users/${userId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/admin/users/${userId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 
@@ -121,11 +121,12 @@ const UserManagement = () => {
           break;
       }
 
-      const response = await fetch(`https://ai-news-image-maker.onrender.com${endpoint}`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(apiUrl + endpoint, {
         method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify(body)
       });

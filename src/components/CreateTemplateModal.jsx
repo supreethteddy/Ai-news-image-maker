@@ -61,11 +61,11 @@ export default function CreateTemplateModal({ onTemplateCreated, onClose }) {
 
     setIsLoading(true);
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/styling-templates', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/styling-templates`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify(formData)
       });

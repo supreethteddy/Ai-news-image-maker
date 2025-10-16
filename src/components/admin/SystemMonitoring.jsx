@@ -60,9 +60,9 @@ export default function SystemMonitoring() {
     console.log('🔑 Token available:', !!token);
     
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/admin/monitoring/metrics', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/admin/monitoring/metrics`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
       
@@ -115,9 +115,9 @@ export default function SystemMonitoring() {
     console.log('🔑 Token available:', !!token);
     
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/admin/monitoring/logs', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/admin/monitoring/logs`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
       

@@ -42,14 +42,14 @@ export class LogoOverlayService {
       console.log('📐 Base image dimensions:', baseImageInfo.width, 'x', baseImageInfo.height);
       console.log('📐 Logo dimensions:', logoInfo.width, 'x', logoInfo.height);
 
-      // Calculate logo size (10% of base image width, maintain aspect ratio)
-      const logoWidth = Math.floor(baseImageInfo.width * 0.1);
+      // Calculate logo size (8% of base image width for better visibility, maintain aspect ratio)
+      const logoWidth = Math.floor(baseImageInfo.width * 0.08);
       const logoHeight = Math.floor((logoWidth * logoInfo.height) / logoInfo.width);
 
-      // Position: top-left corner with 5% margin
-      const margin = Math.floor(baseImageInfo.width * 0.05);
-      const left = margin;
-      const top = margin;
+      // Position: bottom-right corner with 3% margin
+      const margin = Math.floor(baseImageInfo.width * 0.03);
+      const left = baseImageInfo.width - logoWidth - margin;
+      const top = baseImageInfo.height - logoHeight - margin;
 
       console.log('📏 Calculated logo size:', logoWidth, 'x', logoHeight);
       console.log('📍 Logo position:', left, ',', top);

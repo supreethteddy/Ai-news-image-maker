@@ -71,15 +71,27 @@ router.post('/', authenticateToken, validateStoryCreation, async (req, res) => {
       });
     }
 
-    const { original_text, title, visual_style, color_theme, brand_preferences } = req.body;
+    const { original_text, title, visual_style, color_theme, brand_preferences, scene_count } = req.body;
     const userId = req.user.userId;
+
+    // Calculate credits needed based on scene count
+    const creditsNeeded = scene_count || 6; // Default to 6 if not provided
+    
+    // Check if user has enough credits
+    const userCredits = await DatabaseService.getUserCredits(userId);
+    if (userCredits < creditsNeeded) {
+      return res.status(400).json({
+        success: false,
+        error: `Insufficient credits. You need ${creditsNeeded} credits for ${creditsNeeded} scenes, but you only have ${userCredits} credits.`
+      });
+    }
 
     // Generate storyboard using Gemini AI
     const storyboardData = await GeminiService.generateStoryboard(original_text, {
       visualStyle: visual_style || 'realistic',
       colorTheme: color_theme || 'modern',
       ...brand_preferences
-    });
+    }, scene_count || 6);
 
     // Create story record
     const storyData = {
@@ -100,13 +112,16 @@ router.post('/', authenticateToken, validateStoryCreation, async (req, res) => {
 
     const story = storage.createStory(storyData);
 
+    // Deduct credits based on scene count
+    await DatabaseService.deductCredits(userId, creditsNeeded, `Story creation (${creditsNeeded} scenes)`);
+
     // Generate images asynchronously
     generateImagesForStory(story.id, storyboardData.storyboard_parts, visual_style, color_theme, storyboardData.character_persona);
 
     res.status(201).json({
       success: true,
       data: story,
-      message: 'Story created successfully. Images are being generated.'
+      message: `Story created successfully. ${creditsNeeded} credits deducted for ${creditsNeeded} scenes. Images are being generated.`
     });
   } catch (error) {
     console.error('Error creating story:', error);

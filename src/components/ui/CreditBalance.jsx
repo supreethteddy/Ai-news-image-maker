@@ -19,9 +19,9 @@ const CreditBalance = ({ showLabel = true, variant = 'default', className = '' }
     }
 
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/credits/balance', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/credits/balance`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 

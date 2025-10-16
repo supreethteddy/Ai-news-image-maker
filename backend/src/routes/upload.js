@@ -28,25 +28,47 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024 // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    // Strict validation: Only WEBP, PNG, JPEG allowed
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+    
+    const extname = path.extname(file.originalname).toLowerCase();
+    const isValidMimeType = allowedMimeTypes.includes(file.mimetype);
+    const isValidExtension = allowedExtensions.includes(extname);
 
-    if (mimetype && extname) {
+    if (isValidMimeType && isValidExtension) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed!'));
+      cb(new Error('The image was not provided in one of supported formats (WEBP, PNG, JPEG)'));
     }
   }
 });
 
+// Error handling middleware for multer
+const handleMulterError = (error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'File too large. Maximum size is 10MB.'
+      });
+    }
+  } else if (error.message && error.message.includes('supported formats')) {
+    return res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+  next(error);
+};
+
 // Upload character image
-router.post('/character-image', authenticateToken, upload.single('image'), async (req, res) => {
+router.post('/character-image', authenticateToken, upload.single('image'), handleMulterError, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'No image file provided'
+        message: 'No image file provided or file format not supported. Please use WEBP, PNG, or JPEG format.'
       });
     }
 
@@ -89,6 +111,15 @@ router.post('/character-image', authenticateToken, upload.single('image'), async
     });
   } catch (error) {
     console.error('Error uploading image:', error);
+    
+    // Handle multer validation errors
+    if (error.message && error.message.includes('supported formats')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Failed to upload image'

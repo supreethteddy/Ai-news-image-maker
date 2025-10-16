@@ -44,8 +44,33 @@ function PagesContent() {
     // Check if we're on the landing page
     const isLandingPage = location.pathname === '/';
     
+    // Check if we're on a public story view (slug-based URL)
+    // Only treat as public view if it's NOT a known app route
+    const knownRoutes = [
+      '/createstoryboard',
+      '/mystoryboards',
+      '/charactermanagement',
+      '/admindashboard',
+      '/admin'
+    ];
+    
+    // Check if it's viewstoryboard with ?id= parameter (logged in user viewing their own story)
+    const isViewStoryboardWithId = location.pathname.toLowerCase() === '/viewstoryboard' && location.search.includes('id=');
+    
+    const isKnownRoute = knownRoutes.some(route => 
+      location.pathname.toLowerCase().startsWith(route)
+    );
+    
+    // Public story view: clean slug URL, but NOT viewstoryboard with ?id=
+    const isPublicStoryView = !isLandingPage && !isKnownRoute && !isViewStoryboardWithId;
+    
     if (isLandingPage) {
         return <LandingPage />;
+    }
+    
+    // If it's a public story view (clean URL), render without Layout
+    if (isPublicStoryView) {
+        return <ViewStoryboard />;
     }
     
     return (

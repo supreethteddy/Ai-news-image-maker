@@ -165,6 +165,12 @@ router.put('/:id', authenticateToken, [
       updated_at: new Date().toISOString()
     };
 
+    // Map camelCase to snake_case for database
+    if (updateData.isDefault !== undefined) {
+      updateData.is_default = updateData.isDefault;
+      delete updateData.isDefault;
+    }
+
     const updatedTemplate = await DatabaseService.updateStylingTemplate(req.params.id, updateData);
 
     res.json({

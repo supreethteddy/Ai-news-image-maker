@@ -6,15 +6,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, BookOpenText, RefreshCw, Sparkles, Pencil, Check, X, Image, Download } from "lucide-react";
+import { Loader2, BookOpenText, RefreshCw, Sparkles, Pencil, Check, X, Image, Download, Share2, Copy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { runwareImageGeneration } from "@/api/functions"; // Updated import
 import { InvokeLLM } from "@/api/integrations";
 import { Story } from "@/api/entities";
 import { VISUAL_STYLES, COLOR_THEMES } from "../creation/StyleSelector";
 import { useAuth } from "@/contexts/AuthContext";
+import { buildMasterPrompt, buildNegativePrompt, enhanceSceneForCharacter } from "@/utils/masterPrompting";
+import { toast } from "sonner";
 
-export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardUpdate }) {
+export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardUpdate, isPublicView = false }) {
   const { isAuthenticated, token } = useAuth();
   const [regeneratingIndex, setRegeneratingIndex] = useState(null);
   const [regeneratingText, setRegeneratingText] = useState(null);
@@ -24,6 +26,18 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
   const [editedTitleContent, setEditedTitleContent] = useState('');
   const [editingPromptIndex, setEditingPromptIndex] = useState(null);
   const [editedPromptContent, setEditedPromptContent] = useState('');
+  const [showSharePopover, setShowSharePopover] = useState(false);
+
+  // Share storyboard handler
+  const handleShareStoryboard = () => {
+    // Use clean slug-based URL if available, otherwise fallback to ID
+    const shareUrl = storyboard.slug 
+      ? `${window.location.origin}/${storyboard.slug}`
+      : `${window.location.origin}/viewstoryboard?id=${storyboard.id}`;
+    navigator.clipboard.writeText(shareUrl);
+    toast.success('Share link copied to clipboard!');
+    setShowSharePopover(false);
+  };
 
   // Character consistency helper
   const extractCharacterReference = (characterPersona) => {
@@ -44,45 +58,109 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
     return reference.trim().substring(0, 150);
   };
 
-  // Smart prompt builder with length management
+  // Enhanced master prompt builder for regeneration with character focus
   const buildOptimizedPrompt = (scenePrompt, characterRef, visualStyle, colorTheme) => {
-    const MAX_PROMPT_LENGTH = 350; // Slightly reduced to ensure color themes fit
-    
-    // Get style and color modifiers with specific color instructions
-    const styleData = VISUAL_STYLES.find(s => s.key === visualStyle);
-    const colorData = COLOR_THEMES.find(c => c.key === colorTheme);
-    
-    const styleModifier = styleData?.prompt || "high quality, detailed";
-    const colorModifier = colorData?.prompt || "balanced colors";
-    
-    // Build prompt prioritizing scene content and colors
-    let prompt = "";
-    
-    // 1. Core scene (highest priority)
-    prompt += scenePrompt.substring(0, 160);
-    
-    // 2. Character consistency (if characters exist)  
-    if (characterRef && prompt.length < 220) {
-      prompt += `. ${characterRef.substring(0, 60)}`;
+    // Ensure safe inputs
+    const safeScenePrompt = String(scenePrompt || "").trim();
+    const safeCharacterRef = String(characterRef || "").trim();
+    const safeVisualStyle = String(visualStyle || "realistic").trim();
+    const safeColorTheme = String(colorTheme || "modern").trim();
+
+    if (!safeScenePrompt) {
+      return buildMasterPrompt({
+        basePrompt: "detailed professional scene",
+        type: "storyboard",
+        visualStyle: safeVisualStyle,
+        colorTheme: safeColorTheme
+      });
     }
-    
-    // 3. Color theme (CRITICAL - ensure colors are applied!)
-    if (prompt.length < 270) {
-      prompt += `. ${colorModifier}`;
+
+    // Check if storyboard has character information for character-focused prompting
+    const hasCharacter = safeCharacterRef && safeCharacterRef.length > 0;
+    const characterFromPersona = storyboard?.character_persona;
+
+    // If we have character information, use character-focused prompting
+    if (hasCharacter && characterFromPersona) {
+      console.log("Using character-focused regeneration prompting");
+      
+      // Try to parse character from persona for enhanced prompting
+      let characterObj = null;
+      try {
+        // Extract character name and details from character_persona
+        const personaLines = characterFromPersona.split('\n').filter(line => line.trim());
+        let characterName = "";
+        let characterAppearance = "";
+        
+        for (const line of personaLines) {
+          if (line.toLowerCase().includes('character:') || line.includes('**')) {
+            const cleaned = line.replace(/\*\*/g, '').replace(/character:/i, '').trim();
+            if (!characterName && cleaned.length > 0) {
+              characterName = cleaned.split(',')[0] || cleaned.split('.')[0];
+            }
+            if (cleaned.includes('appearance') || cleaned.includes('hair') || cleaned.includes('eyes')) {
+              characterAppearance += cleaned + ". ";
+            }
+          }
+        }
+        
+        if (characterName) {
+          characterObj = {
+            name: characterName.trim(),
+            appearance: characterAppearance.trim(),
+            description: characterFromPersona.substring(0, 200)
+          };
+        }
+      } catch (error) {
+        console.log("Could not parse character from persona:", error);
+      }
+
+      // Use character scene enhancement if we have character data
+      if (characterObj) {
+        return enhanceSceneForCharacter(
+          safeScenePrompt,
+          characterObj,
+          {
+            visualStyle: safeVisualStyle,
+            colorTheme: safeColorTheme,
+            lighting: {
+              warm: "golden",
+              cool: "natural", 
+              vibrant: "dramatic",
+              muted: "soft",
+              monochrome: "dramatic",
+              modern: "natural"
+            }[safeColorTheme] || "natural"
+          }
+        );
+      }
     }
+
+    // Fallback to standard master prompting
+    const lightingMap = {
+      warm: "golden",
+      cool: "natural", 
+      vibrant: "dramatic",
+      muted: "soft",
+      monochrome: "dramatic",
+      modern: "natural"
+    };
     
-    // 4. Style (essential for quality)
-    if (prompt.length < 320) {
-      prompt += `. ${styleModifier}`;
-    }
-    
-    // 5. Quality modifiers (final touch)
-    if (prompt.length < 340) {
-      prompt += ". Clean, detailed";
-    }
-    
-    // Ensure we don't exceed limit
-    return prompt.substring(0, MAX_PROMPT_LENGTH);
+    const lighting = lightingMap[safeColorTheme] || "natural";
+    const mood = safeScenePrompt.toLowerCase().includes('action') ? "dramatic" : "professional";
+
+    // Use standard master prompting system for regeneration
+    return buildMasterPrompt({
+      basePrompt: safeScenePrompt,
+      type: "storyboard",
+      visualStyle: safeVisualStyle,
+      colorTheme: safeColorTheme,
+      characterRef: safeCharacterRef,
+      mood: mood,
+      cameraAngle: "medium shot",
+      lighting: lighting,
+      priority: "quality",
+      forceCharacterInclusion: hasCharacter
+    });
   };
 
   // These functions are no longer used for image generation but kept for completeness
@@ -138,8 +216,18 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
 
       console.log(`Regenerating image with prompt: ${optimizedPrompt}`); // Debug logging
 
-      // Changed from GenerateImage to runwareImageGeneration
-      const imageResult = await runwareImageGeneration({ prompt: optimizedPrompt });
+      // Generate negative prompt for better results, enhanced for character consistency
+      const hasCharacterInStoryboard = Boolean(characterRef || storyboard?.character_persona);
+      const negativePrompt = buildNegativePrompt("storyboard", hasCharacterInStoryboard);
+
+      // Changed from GenerateImage to runwareImageGeneration with master prompting
+      const imageResult = await runwareImageGeneration({ 
+        prompt: optimizedPrompt,
+        negativePrompt: negativePrompt,
+        options: {
+          negativePrompt: negativePrompt
+        }
+      });
 
       if (imageResult.data && imageResult.data.url) {
         // Update the storyboard
@@ -307,9 +395,9 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
     try {
       // If authenticated, use backend proxy for download
       if (isAuthenticated && token && storyboard.id && !storyboard.id.startsWith('local_')) {
-        const response = await fetch(`https://ai-news-image-maker.onrender.com/api/storyboards/${storyboard.id}/images/${partIndex}/download`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/storyboards/${storyboard.id}/images/${partIndex}/download`, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': 'Bearer ' + token
           }
         });
 
@@ -373,9 +461,51 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
       className="space-y-6 md:space-y-8"
     >
       <div className="text-center mb-8 md:mb-12 px-2">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-slate-900 mb-3 md:mb-4 leading-tight">
-          {storyboard.title || "Your Visual Story"}
-        </h1>
+        <div className="flex items-center justify-center gap-4 mb-3 md:mb-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight">
+            {storyboard.title || "Your Visual Story"}
+          </h1>
+          
+          {/* Share Button - Only show for authenticated users, not public view */}
+          {!isPublicView && storyboard.id && !storyboard.id.startsWith('local_') && (
+            <Popover open={showSharePopover} onOpenChange={setShowSharePopover}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-white border-blue-600 text-blue-600 hover:bg-blue-50 shadow-md hover:shadow-lg transition-all duration-300"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Share this storyboard</h4>
+                    <p className="text-xs text-slate-600 mb-3">
+                      Anyone with this link can view and download this storyboard
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input 
+                      readOnly 
+                      value={storyboard.slug 
+                        ? `${window.location.origin}/${storyboard.slug}`
+                        : `${window.location.origin}/viewstoryboard?id=${storyboard.id}`
+                      }
+                      className="text-xs"
+                    />
+                    <Button onClick={handleShareStoryboard} size="sm">
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
+        
         <div className="w-16 md:w-24 h-0.5 md:h-1 bg-gradient-to-r from-purple-500 to-blue-600 mx-auto rounded-full"></div>
         
         {/* Style and Mood indicators */}
@@ -435,30 +565,35 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
                             <h3 className="text-sm md:text-lg font-bold text-slate-800 leading-tight truncate">
                               {part.section_title || `Section ${index + 1}`}
                             </h3>
-                            <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600 h-8 w-8 flex-shrink-0" onClick={() => handleEditTitleClick(index, part.section_title)}>
-                                <Pencil className="w-4 h-4" />
-                            </Button>
+                            {!isPublicView && (
+                              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600 h-8 w-8 flex-shrink-0" onClick={() => handleEditTitleClick(index, part.section_title)}>
+                                  <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => regenerateText(index)}
-                          disabled={regeneratingText === index || editingTextIndex === index || editingTitleIndex === index}
-                          className="bg-white text-slate-900 border border-blue-600 shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-300 p-1 md:p-2 min-h-[36px] touch-manipulation disabled:opacity-50 text-xs"
-                        >
-                          {regeneratingText === index ? (
-                            <Loader2 className="w-3 md:w-4 h-3 md:h-4 animate-spin" />
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <Sparkles className="w-3 h-3" />
-                              <span>Regenerate Text</span>
-                            </div>
-                          )}
-                        </Button>
-                      </div>
+                      {/* Regenerate Text button - Only show for authenticated users, not public view */}
+                      {!isPublicView && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => regenerateText(index)}
+                            disabled={regeneratingText === index || editingTextIndex === index || editingTitleIndex === index}
+                            className="bg-white text-slate-900 border border-blue-600 shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-300 p-1 md:p-2 min-h-[36px] touch-manipulation disabled:opacity-50 text-xs"
+                          >
+                            {regeneratingText === index ? (
+                              <Loader2 className="w-3 md:w-4 h-3 md:h-4 animate-spin" />
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" />
+                                <span>Regenerate Text</span>
+                              </div>
+                            )}
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     {editingTextIndex === index ? (
@@ -483,9 +618,11 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
                          <p className="flex-1 text-slate-700 leading-relaxed text-sm md:text-base lg:text-lg font-medium">
                            {part.text}
                          </p>
-                         <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600 h-8 w-8" onClick={() => handleEditClick(index, part.text)}>
-                            <Pencil className="w-4 h-4" />
-                         </Button>
+                         {!isPublicView && (
+                           <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600 h-8 w-8" onClick={() => handleEditClick(index, part.text)}>
+                              <Pencil className="w-4 h-4" />
+                           </Button>
+                         )}
                        </div>
                     )}
                   </div>
@@ -508,75 +645,78 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.8 }}
                       />
-                      <div className="absolute top-2 md:top-3 right-2 md:right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => regenerateImage(index)}
-                            disabled={regeneratingIndex === index}
-                            className="bg-white text-slate-900 border border-blue-600 shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-300 text-xs md:text-sm px-2 md:px-3 py-1 md:py-2 min-h-[36px] touch-manipulation"
-                          >
-                            <RefreshCw className="w-3 md:w-4 h-3 md:h-4 mr-1" />
-                            Regenerate Image
-                          </Button>
-                          
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleDownloadImage(index)}
-                            className="bg-white text-slate-900 border border-green-600 shadow-md hover:shadow-lg hover:bg-green-50 transition-all duration-300 text-xs md:text-sm px-2 md:px-3 py-1 md:py-2 min-h-[36px] touch-manipulation"
-                          >
-                            <Download className="w-3 md:w-4 h-3 md:h-4 mr-1" />
-                            Download
-                          </Button>
-                          
-                          <Popover open={editingPromptIndex === index} onOpenChange={(open) => setEditingPromptIndex(open ? index : null)}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handleEditPromptClick(index, part.image_prompt)}
-                                disabled={regeneratingIndex === index}
-                                className="bg-white text-slate-900 border border-purple-600 shadow-md hover:shadow-lg hover:bg-purple-50 transition-all duration-300 text-xs md:text-sm px-2 md:px-3 py-1 md:py-2 min-h-[36px] touch-manipulation"
-                              >
-                                <Pencil className="w-3 md:w-4 h-3 md:h-4 mr-1" />
-                                Edit Image Prompt
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-96 p-4">
-                              <div className="space-y-3">
-                                <h4 className="font-semibold text-sm">Edit Complete Image Prompt</h4>
-                                <p className="text-xs text-slate-600">Modify the base prompt below to change the generated image. Be descriptive for best results.</p>
-                                <Textarea
-                                  value={editedPromptContent}
-                                  onChange={(e) => setEditedPromptContent(e.target.value)}
-                                  placeholder="e.g., 'A scientist in a futuristic lab looking at a glowing blue liquid...'"
-                                  className="w-full min-h-[120px] text-sm"
-                                />
-                                <div className="flex justify-end gap-2">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={handleCancelEditPrompt}
-                                    className="text-xs"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    onClick={() => handleSaveAndRegenerateImage(index)}
-                                    disabled={!editedPromptContent || !editedPromptContent.trim() || regeneratingIndex === index}
-                                    className="bg-white text-slate-900 border border-blue-600 shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-300 text-xs"
-                                  >
-                                    Save & Regenerate
-                                  </Button>
+                      {/* Action buttons - Only show for authenticated users, not public view */}
+                      {!isPublicView && (
+                        <div className="absolute top-2 md:top-3 right-2 md:right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => regenerateImage(index)}
+                              disabled={regeneratingIndex === index}
+                              className="bg-white text-slate-900 border border-blue-600 shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-300 text-xs md:text-sm px-2 md:px-3 py-1 md:py-2 min-h-[36px] touch-manipulation"
+                            >
+                              <RefreshCw className="w-3 md:w-4 h-3 md:h-4 mr-1" />
+                              Regenerate Image
+                            </Button>
+                            
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleDownloadImage(index)}
+                              className="bg-white text-slate-900 border border-green-600 shadow-md hover:shadow-lg hover:bg-green-50 transition-all duration-300 text-xs md:text-sm px-2 md:px-3 py-1 md:py-2 min-h-[36px] touch-manipulation"
+                            >
+                              <Download className="w-3 md:w-4 h-3 md:h-4 mr-1" />
+                              Download
+                            </Button>
+                            
+                            <Popover open={editingPromptIndex === index} onOpenChange={(open) => setEditingPromptIndex(open ? index : null)}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handleEditPromptClick(index, part.image_prompt)}
+                                  disabled={regeneratingIndex === index}
+                                  className="bg-white text-slate-900 border border-purple-600 shadow-md hover:shadow-lg hover:bg-purple-50 transition-all duration-300 text-xs md:text-sm px-2 md:px-3 py-1 md:py-2 min-h-[36px] touch-manipulation"
+                                >
+                                  <Pencil className="w-3 md:w-4 h-3 md:h-4 mr-1" />
+                                  Edit Image Prompt
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-96 p-4">
+                                <div className="space-y-3">
+                                  <h4 className="font-semibold text-sm">Edit Complete Image Prompt</h4>
+                                  <p className="text-xs text-slate-600">Modify the base prompt below to change the generated image. Be descriptive for best results.</p>
+                                  <Textarea
+                                    value={editedPromptContent}
+                                    onChange={(e) => setEditedPromptContent(e.target.value)}
+                                    placeholder="e.g., 'A scientist in a futuristic lab looking at a glowing blue liquid...'"
+                                    className="w-full min-h-[120px] text-sm"
+                                  />
+                                  <div className="flex justify-end gap-2">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      onClick={handleCancelEditPrompt}
+                                      className="text-xs"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      onClick={() => handleSaveAndRegenerateImage(index)}
+                                      disabled={!editedPromptContent || !editedPromptContent.trim() || regeneratingIndex === index}
+                                      className="bg-white text-slate-900 border border-blue-600 shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-300 text-xs"
+                                    >
+                                      Save & Regenerate
+                                    </Button>
+                                  </div>
                                 </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center text-slate-400">

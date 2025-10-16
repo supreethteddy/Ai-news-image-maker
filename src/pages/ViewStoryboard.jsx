@@ -12,23 +12,56 @@ export default function ViewStoryboard() {
   const [storyboard, setStoryboard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isPublicView, setIsPublicView] = useState(false);
 
   useEffect(() => {
+    // Get slug from URL path (e.g., /story-name instead of /viewstoryboard?id=xxx)
+    const pathname = window.location.pathname;
+    const slug = pathname.substring(1); // Remove leading slash
+    
+    // Also check for legacy ?id= parameter
     const urlParams = new URLSearchParams(window.location.search);
     const storyId = urlParams.get('id');
     
-    if (storyId) {
+    if (slug && slug !== 'viewstoryboard') {
+      // This is a public slug-based URL
+      setIsPublicView(true);
+      loadStoryboardBySlug(slug);
+    } else if (storyId) {
+      // This is a logged-in user viewing their own story with ?id=
+      setIsPublicView(false);
       loadStoryboard(storyId);
     } else {
-      setError("No story ID provided");
+      setError("No story provided");
       setIsLoading(false);
     }
   }, []);
 
+  const loadStoryboardBySlug = async (slug) => {
+    setIsLoading(true);
+    try {
+      const story = await Story.getPublicBySlug(slug);
+      setStoryboard(story);
+    } catch (error) {
+      console.error("Error loading storyboard by slug:", error);
+      setError("Story not found or failed to load");
+    }
+    setIsLoading(false);
+  };
+
   const loadStoryboard = async (id) => {
     setIsLoading(true);
     try {
-      const story = await Story.get(id);
+      // Try public first to allow shareable access; fallback to authed get (for owner)
+      let story = null;
+      try {
+        story = await Story.getPublic(id);
+      } catch (_) {
+        // ignore
+      }
+      if (!story) {
+        story = await Story.get(id);
+      }
       setStoryboard(story);
     } catch (error) {
       console.error("Error loading storyboard:", error);
@@ -70,31 +103,40 @@ export default function ViewStoryboard() {
   }
 
   return (
-    <div className="min-h-screen gradient-bg">
-      {/* Header */}
-      <div className="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-white">
+      {/* Clean header - no sidebar, minimal UI */}
+      <div className="border-b border-slate-200/60 bg-white sticky top-0 z-10 shadow-sm">
         <div className="max-w-6xl mx-auto px-3 md:px-4 lg:px-8 py-3 md:py-4">
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="flex items-center justify-between"
           >
-            <Link to={createPageUrl("MyStoryboards")}>
-              <Button className="bg-white text-slate-900 border border-blue-600 shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-300 min-h-[44px] touch-manipulation">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                <span className="text-sm md:text-base">Back to My Stories</span>
-              </Button>
-            </Link>
+            <div className="flex items-center gap-3">
+              <img 
+                src="/newsplay-logo.png" 
+                alt="NewsPlay" 
+                className="h-8 w-auto"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+              <h1 className="text-lg md:text-xl font-bold text-slate-800">
+                {storyboard.title}
+              </h1>
+            </div>
           </motion.div>
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content - Full width, no sidebar */}
       <div className="max-w-6xl mx-auto px-3 md:px-4 lg:px-8 py-6 md:py-8">
         <StoryboardDisplay 
           storyboard={storyboard} 
           isLoading={false}
           onStoryboardUpdate={handleStoryboardUpdate}
+          isPublicView={isPublicView}
         />
       </div>
     </div>

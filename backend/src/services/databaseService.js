@@ -10,9 +10,24 @@ if (!supabaseUrl || !supabaseServiceKey) {
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export class DatabaseService {
+  // Helper function to generate slug from title
+  static generateSlug(title) {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .substring(0, 80); // Limit length
+  }
+
   // Storyboards
   static async createStoryboard(data) {
     try {
+      // Generate slug from title if not provided
+      if (!data.slug && data.title) {
+        data.slug = this.generateSlug(data.title);
+      }
+
       const { data: result, error } = await supabase
         .from('storyboards')
         .insert([data])
@@ -52,7 +67,8 @@ export class DatabaseService {
         style: storyboard.style,
         user_id: storyboard.user_id,
         created_at: storyboard.created_at,
-        updated_at: storyboard.updated_at
+        updated_at: storyboard.updated_at,
+        slug: storyboard.slug
       }));
       
       return transformedData;
@@ -87,12 +103,49 @@ export class DatabaseService {
         style: data.style,
         user_id: data.user_id,
         created_at: data.created_at,
-        updated_at: data.updated_at
+        updated_at: data.updated_at,
+        slug: data.slug
       };
       
       return transformedData;
     } catch (error) {
       console.error('Error fetching storyboard:', error);
+      throw error;
+    }
+  }
+
+  static async getStoryboardBySlug(slug) {
+    try {
+      const { data, error } = await supabase
+        .from('storyboards')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+
+      if (error) throw error;
+      
+      // Transform data to match frontend expectations
+      const transformedData = {
+        id: data.id,
+        title: data.title,
+        original_text: data.original_text,
+        storyboard_parts: (data.storyboard_parts || []).map(part => ({
+          text: part.text,
+          image_prompt: part.image_prompt || part.imagePrompt,
+          section_title: part.section_title || part.sectionTitle,
+          image_url: part.image_url || part.imageUrl
+        })),
+        character_id: data.character_id,
+        style: data.style,
+        user_id: data.user_id,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        slug: data.slug
+      };
+      
+      return transformedData;
+    } catch (error) {
+      console.error('Error fetching storyboard by slug:', error);
       throw error;
     }
   }
@@ -1431,7 +1484,12 @@ export class DatabaseService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      
+      // Transform snake_case to camelCase for frontend
+      return (data || []).map(template => ({
+        ...template,
+        isDefault: template.is_default
+      }));
     } catch (error) {
       console.error('Error getting styling templates by user:', error);
       throw error;

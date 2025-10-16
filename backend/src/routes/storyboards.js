@@ -141,18 +141,101 @@ router.get('/:id', authenticateToken, canAccessStoryboard, async (req, res) => {
   }
 });
 
+// Public: Get a storyboard by slug (SEO-friendly URL)
+router.get('/public/story/:slug', async (req, res) => {
+  try {
+    const storyboard = await DatabaseService.getStoryboardBySlug(req.params.slug);
+
+    if (!storyboard) {
+      return res.status(404).json({
+        success: false,
+        message: 'Storyboard not found'
+      });
+    }
+
+    // Return only public-safe fields
+    return res.json({
+      success: true,
+      data: {
+        id: storyboard.id,
+        title: storyboard.title,
+        original_text: storyboard.original_text,
+        storyboard_parts: storyboard.storyboard_parts,
+        slug: storyboard.slug
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching public storyboard by slug:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch storyboard'
+    });
+  }
+});
+
+// Public: Get a storyboard by id (read-only, limited fields) - Legacy support
+router.get('/public/:id', async (req, res) => {
+  try {
+    try {
+      const storyboard = await DatabaseService.getStoryboardById(req.params.id);
+
+      if (!storyboard) {
+        return res.status(404).json({
+          success: false,
+          message: 'Storyboard not found'
+        });
+      }
+
+      // Return only public-safe fields
+      return res.json({
+        success: true,
+        data: {
+          id: storyboard.id,
+          title: storyboard.title,
+          original_text: storyboard.original_text,
+          storyboard_parts: storyboard.storyboard_parts,
+          slug: storyboard.slug
+        }
+      });
+    } catch (dbError) {
+      // Fallback to in-memory storage if DB fails
+      const storyboard = storage.getStoryboardById(req.params.id);
+      if (!storyboard) {
+        return res.status(404).json({
+          success: false,
+          message: 'Storyboard not found'
+        });
+      }
+      return res.json({
+        success: true,
+        data: {
+          id: storyboard.id,
+          title: storyboard.title,
+          original_text: storyboard.originalText || storyboard.original_text,
+          storyboard_parts: storyboard.storyboardParts || storyboard.storyboard_parts
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching public storyboard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch storyboard'
+    });
+  }
+});
+
 // Create a new storyboard
 router.post('/', 
   authenticateToken, 
-  checkCredits(1), // Require 1 credit for storyboard creation
   [
     body('title').notEmpty().withMessage('Storyboard title is required'),
     body('original_text').notEmpty().withMessage('Original text is required'),
     body('storyboard_parts').isArray().withMessage('Storyboard parts must be an array'),
     body('character_id').optional().isString(),
-    body('visual_style').optional().isString()
+    body('visual_style').optional().isString(),
+    body('scene_count').optional().isInt({ min: 3, max: 10 }).withMessage('Scene count must be between 3 and 10')
   ],
-  deductCredits('Storyboard creation'), // Deduct credits after validation
   async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -164,7 +247,19 @@ router.post('/',
       });
     }
 
-    const { title, original_text, storyboard_parts, character_id, visual_style } = req.body;
+    const { title, original_text, storyboard_parts, character_id, visual_style, scene_count } = req.body;
+    
+    // Calculate credits needed based on scene count
+    const creditsNeeded = scene_count || 6; // Default to 6 if not provided
+    
+    // Check if user has enough credits
+    const userCredits = await DatabaseService.getUserCredits(req.user.userId);
+    if (userCredits < creditsNeeded) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient credits. You need ${creditsNeeded} credits for ${creditsNeeded} scenes, but you only have ${userCredits} credits.`
+      });
+    }
 
     const storyboardData = {
       title,
@@ -172,6 +267,7 @@ router.post('/',
       storyboard_parts,
       character_id,
       style: visual_style || 'realistic',
+      scene_count: scene_count || 6, // Default to 6 if not provided
       user_id: req.user.userId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -179,14 +275,17 @@ router.post('/',
 
     const storyboard = await DatabaseService.createStoryboard(storyboardData);
 
-    // Get updated credit balance (credits already deducted by middleware)
-    const userCredits = await DatabaseService.getUserCredits(req.user.userId);
+    // Deduct credits based on scene count
+    await DatabaseService.deductCredits(req.user.userId, creditsNeeded, `Storyboard creation (${creditsNeeded} scenes)`);
+
+    // Get updated credit balance after deduction
+    const updatedUserCredits = await DatabaseService.getUserCredits(req.user.userId);
 
     res.status(201).json({
       success: true,
       data: storyboard,
-      message: 'Storyboard saved successfully',
-      userCredits
+      message: `Storyboard saved successfully. ${creditsNeeded} credits deducted for ${creditsNeeded} scenes.`,
+      userCredits: updatedUserCredits
     });
   } catch (error) {
     console.error('Error creating storyboard:', error);

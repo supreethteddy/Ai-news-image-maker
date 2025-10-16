@@ -100,18 +100,19 @@ const AuthModal = ({ isOpen, onClose }) => {
     try {
       const result = await login(formData.email, formData.password);
       if (result.success) {
-        // Check if user is flagged
-        if (result.user.user.is_flagged) {
+        // Check if user is flagged (handle both nested and flat user structure)
+        const user = result.user?.user || result.user;
+        if (user?.is_flagged) {
           setLoginResult(result);
           setShowFlaggedDialog(true);
-          setFlaggedReason(result.user.user.flag_reason || "No reason provided");
+          setFlaggedReason(user.flag_reason || "No reason provided");
           return; // Show dialog first, don't proceed yet
         }
         
         toast.success("Welcome back!");
         onClose();
         // Redirect based on user role
-        if (result.user.user && result.user.user.role === "admin") {
+        if (user && user.role === "admin") {
           window.location.href = "/admin";
         } else {
           window.location.href = "/CreateStoryboard";
@@ -126,7 +127,8 @@ const AuthModal = ({ isOpen, onClose }) => {
           toast.error(result.message);
         }
       }
-    } catch {
+    } catch (error) {
+      console.error('Login error:', error);
       toast.error("An error occurred during login");
     } finally {
       setLoading(false);
@@ -172,8 +174,9 @@ const AuthModal = ({ isOpen, onClose }) => {
     setShowFlaggedDialog(false);
     toast.success("Welcome back!");
     onClose();
-    // Redirect based on user role
-    if (loginResult?.user?.user?.role === "admin") {
+    // Redirect based on user role (handle both nested and flat user structure)
+    const user = loginResult?.user?.user || loginResult?.user;
+    if (user && user.role === "admin") {
       window.location.href = "/admin";
     } else {
       window.location.href = "/CreateStoryboard";

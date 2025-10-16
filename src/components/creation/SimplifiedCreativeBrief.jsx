@@ -73,9 +73,9 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
     if (!isAuthenticated || !token) return;
 
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/styling-templates', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/styling-templates`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 
@@ -101,10 +101,10 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/upload/logo', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/upload/logo`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
         body: formData
       });
@@ -138,11 +138,11 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
 
     setSaving(true);
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/styling-templates', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/styling-templates`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify({
           name: briefData.brand_name,
@@ -188,11 +188,11 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
     if (!isAuthenticated || !token) return;
     
     try {
-      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/styling-templates/${template.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/styling-templates/${template.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify({
           isDefault: true
@@ -517,7 +517,7 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
                         Include logo in generated images
                       </label>
                       <p className="text-xs text-blue-700 mt-1">
-                        Your logo will be placed in the top-left corner of all generated storyboard images
+                        Your logo will be placed in the bottom-right corner of all generated storyboard images
                       </p>
                     </div>
                   </div>

@@ -1,5 +1,5 @@
 // API Client for NewsPlay Backend
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://ai-news-image-maker.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const TOKEN_KEY = 'supabase_token';
 
 class ApiClient {
@@ -96,6 +96,16 @@ class ApiClient {
     return this.request(`/storyboards/${id}`);
   }
 
+  async getPublicStory(id) {
+    // No auth header required on backend route, but client may still send token; backend ignores
+    return this.request(`/storyboards/public/${id}`);
+  }
+
+  async getPublicStoryBySlug(slug) {
+    // No auth required - public endpoint
+    return this.request(`/storyboards/public/story/${slug}`);
+  }
+
   async createStory(storyData) {
     return this.request('/storyboards', {
       method: 'POST',
@@ -184,6 +194,22 @@ class ApiClient {
   // Health check
   async healthCheck() {
     return fetch(`${this.baseURL.replace('/api', '')}/health`).then(res => res.json());
+  }
+
+  // Branding methods
+  async getPublicBranding() {
+    return this.request('/admin/branding-public');
+  }
+
+  async getBranding() {
+    return this.request('/admin/branding');
+  }
+
+  async updateBranding(payload) {
+    return this.request('/admin/branding', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
   }
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,11 +19,24 @@ import {
   Clock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import apiClient from '@/api/client';
 import AuthModal from '@/components/AuthModal';
 
 const LandingPage = () => {
   const { isAuthenticated } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [branding, setBranding] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiClient.getPublicBranding();
+        if (res?.success) setBranding(res.data);
+      } catch (e) {
+        // swallow
+      }
+    })();
+  }, []);
 
   const features = [
     {
@@ -104,10 +117,14 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-slate-900">NewsPlay</span>
+              {branding?.iconUrl ? (
+                <img src={branding.iconUrl} alt="icon" className="w-8 h-8 rounded-lg" />
+              ) : (
+                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+              )}
+              <span className="text-xl font-bold text-slate-900">{branding?.brandName || 'NewsPlay'}</span>
             </div>
             <div className="flex items-center space-x-4">
               <Button 
@@ -146,8 +163,7 @@ const LandingPage = () => {
                 <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Visual Stories</span>
               </h1>
               <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-                Create stunning storyboards from any text using AI. Maintain character consistency, 
-                apply your brand styling, and generate professional visuals in seconds.
+                {branding?.footerText || 'Create stunning storyboards from any text using AI. Maintain character consistency, apply your brand styling, and generate professional visuals in seconds.'}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                 <Button 
@@ -651,14 +667,17 @@ const LandingPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold">NewsPlay</span>
+                {branding?.logoUrl ? (
+                  <img src={branding.logoUrl} alt="logo" className="w-8 h-8 rounded-lg" />
+                ) : (
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                )}
+                <span className="text-xl font-bold">{branding?.brandName || 'NewsPlay'}</span>
               </div>
               <p className="text-slate-400 mb-4 max-w-md">
-                Transform any text into captivating visual storyboards using AI. 
-                Create consistent characters, apply brand styling, and generate professional visuals in seconds.
+                {branding?.footerText || 'Transform any text into captivating visual storyboards using AI.'}
               </p>
               <div className="flex space-x-4">
                 <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">

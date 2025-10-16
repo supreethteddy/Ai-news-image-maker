@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import storage from '../storage/inMemoryStorage.js';
 import { db } from '../lib/supabase.js';
 import storageService from '../services/storageService.js';
+import { DatabaseService } from '../services/databaseService.js';
 import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
@@ -17,18 +18,35 @@ const router = express.Router();
 // Get all characters for authenticated user
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    // DEBUG: Log fetch request
+    console.log('🔍 Characters GET request debug:');
+    console.log('  - User ID:', req.user.userId);
+    console.log('  - User ID type:', typeof req.user.userId);
+    console.log('  - Full user object:', req.user);
+    
     // Try Supabase first, fallback to in-memory storage
     const { data: supabaseCharacters, error: supabaseError } = await db.characters.getAll(req.user.userId);
     
+    console.log('📊 Supabase fetch result:');
+    console.log('  - Success:', !!supabaseCharacters && !supabaseError);
+    console.log('  - Characters found:', supabaseCharacters?.length || 0);
+    console.log('  - Error:', supabaseError);
+    console.log('  - Characters data:', supabaseCharacters);
+    
     if (supabaseCharacters && !supabaseError) {
+      console.log('✅ SUCCESS: Characters fetched from Supabase database');
       res.json({
         success: true,
         data: supabaseCharacters
       });
     } else {
       // Fallback to in-memory storage
-      console.log('Supabase unavailable, using in-memory storage:', supabaseError?.message);
+      console.log('❌ FALLBACK: Supabase failed, using in-memory storage');
+      console.log('  - Supabase error:', supabaseError?.message);
+      
       const characters = storage.getCharactersByUser(req.user.userId);
+      console.log('  - In-memory characters:', characters?.length || 0);
+      
       res.json({
         success: true,
         data: characters
@@ -83,8 +101,7 @@ router.post('/', authenticateToken, [
   body('imageUrl').optional().isURL().withMessage('Invalid image URL'),
   body('imagePrompt').optional().isString(),
   body('personality').optional().isString(),
-  body('appearance').optional().isString(),
-  body('source').optional().isIn(['upload', 'generated', 'camera']).withMessage('Invalid source type')
+  body('appearance').optional().isString()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -96,15 +113,34 @@ router.post('/', authenticateToken, [
       });
     }
 
+    // DEBUG: Log user info
+    console.log('🔍 Character creation debug:');
+    console.log('  - User ID:', req.user.userId);
+    console.log('  - User ID type:', typeof req.user.userId);
+    console.log('  - Full user object:', req.user);
+    console.log('  - Character name:', req.body.name);
+
     const characterData = {
-      ...req.body,
+      name: req.body.name,
+      description: req.body.description || null,
+      image_url: req.body.imageUrl || null,
+      reference_image_url: req.body.referenceImageUrl || null,
+      prompt: req.body.imagePrompt || null,
       user_id: req.user.userId
     };
+
+    console.log('  - Character data to save:', characterData);
 
     // Try Supabase first, fallback to in-memory storage
     const { data: supabaseCharacter, error: supabaseError } = await db.characters.create(characterData);
     
+    console.log('📊 Supabase creation result:');
+    console.log('  - Success:', !!supabaseCharacter && !supabaseError);
+    console.log('  - Character data:', supabaseCharacter);
+    console.log('  - Error:', supabaseError);
+    
     if (supabaseCharacter && !supabaseError) {
+      console.log('✅ SUCCESS: Character saved to Supabase database');
       res.status(201).json({
         success: true,
         data: supabaseCharacter,
@@ -112,7 +148,10 @@ router.post('/', authenticateToken, [
       });
     } else {
       // Fallback to in-memory storage
-      console.log('Supabase unavailable, using in-memory storage:', supabaseError?.message);
+      console.log('❌ FALLBACK: Supabase failed, using in-memory storage');
+      console.log('  - Supabase error:', supabaseError?.message);
+      console.log('  - Full error:', supabaseError);
+      
       const fallbackData = {
         ...req.body,
         userId: req.user.userId,
@@ -124,7 +163,7 @@ router.post('/', authenticateToken, [
       res.status(201).json({
         success: true,
         data: character,
-        message: 'Character created successfully'
+        message: 'Character created successfully (in-memory only - CHECK LOGS!)'
       });
     }
   } catch (error) {
@@ -196,9 +235,39 @@ router.put('/:id', authenticateToken, [
 // Delete a character
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const character = storage.getCharacterById(req.params.id);
+    // Try Supabase first
+    const character = await DatabaseService.getCharacterById(req.params.id);
     
-    if (!character) {
+    if (character) {
+      // Character found in Supabase
+      // Check if character belongs to the authenticated user
+      if (character.user_id !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Delete from Supabase
+      const deleteSuccess = await DatabaseService.deleteCharacter(req.params.id);
+      
+      if (!deleteSuccess) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to delete character'
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Character deleted successfully'
+      });
+    }
+
+    // Fallback to in-memory storage
+    const inMemoryCharacter = storage.getCharacterById(req.params.id);
+    
+    if (!inMemoryCharacter) {
       return res.status(404).json({
         success: false,
         message: 'Character not found'
@@ -206,7 +275,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
 
     // Check if character belongs to the authenticated user
-    if (character.userId !== req.user.userId) {
+    if (inMemoryCharacter.userId !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'

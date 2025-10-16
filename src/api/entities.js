@@ -22,6 +22,16 @@ export const Story = {
     return response.data;
   },
 
+  async getPublic(id) {
+    const response = await apiClient.getPublicStory(id);
+    return response.data;
+  },
+
+  async getPublicBySlug(slug) {
+    const response = await apiClient.getPublicStoryBySlug(slug);
+    return response.data;
+  },
+
   async delete(id) {
     await apiClient.deleteStory(id);
   },

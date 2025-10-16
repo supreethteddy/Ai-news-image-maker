@@ -39,44 +39,37 @@ export const AuthProvider = ({ children }) => {
         const storedToken = localStorage.getItem('supabase_token');
         
         if (storedToken) {
-          console.log('🔍 Found stored token, fetching user profile from database...');
+          console.log('🔍 Found stored token, using token claims for faster startup...');
           
-          // Fetch user profile from database using the token
-          const response = await fetch('https://ai-news-image-maker.onrender.com/api/auth/profile', {
-            headers: {
-              'Authorization': `Bearer ${storedToken}`
-            }
-          });
+          // Use token claims immediately for faster startup
+          const minimalUser = getUserFromToken(storedToken);
+          if (minimalUser) {
+            setUser(minimalUser);
+            setToken(storedToken);
+            console.log('✅ User restored from token claims');
+          } else {
+            localStorage.removeItem('supabase_token');
+            setUser(null);
+            setToken(null);
+          }
           
-          if (response.ok) {
-            const profileData = await response.json();
-            if (profileData.success && profileData.data) {
-              console.log('✅ User profile fetched from database:', profileData.data);
-              setUser(profileData.data);
-              setToken(storedToken);
-            } else {
-              console.log('⚠️ No DB profile yet. Falling back to token claims.');
-              const minimalUser = getUserFromToken(storedToken);
-              if (minimalUser) {
-                setUser(minimalUser);
-                setToken(storedToken);
-              } else {
-                localStorage.removeItem('supabase_token');
-                setUser(null);
-                setToken(null);
+          // Fetch fresh profile in background (non-blocking)
+          try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/profile`, {
+              headers: {
+                'Authorization': `Bearer ${storedToken}`
+              }
+            });
+            
+            if (response.ok) {
+              const profileData = await response.json();
+              if (profileData.success && profileData.data) {
+                console.log('✅ Fresh user profile fetched from database:', profileData.data);
+                setUser(profileData.data);
               }
             }
-          } else {
-            console.log('⚠️ Profile fetch failed. Using token claims if available.');
-            const minimalUser = getUserFromToken(storedToken);
-            if (minimalUser) {
-              setUser(minimalUser);
-              setToken(storedToken);
-            } else {
-              localStorage.removeItem('supabase_token');
-              setUser(null);
-              setToken(null);
-            }
+          } catch (profileError) {
+            console.log('⚠️ Background profile fetch failed, using token claims');
           }
         } else {
           console.log('🔍 No stored token found');
@@ -100,7 +93,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       console.log('Attempting login with backend API:', email);
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/auth/login', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,39 +107,29 @@ export const AuthProvider = ({ children }) => {
         console.log('✅ Login successful:', data.message);
         console.log('🔑 Token received:', data.data.token);
         
-        // Store the token
+        // Store the token immediately
         setToken(data.data.token);
         localStorage.setItem('supabase_token', data.data.token);
         
-        // Fetch fresh user profile from database
-        console.log('🔄 Fetching user profile from database...');
-        const profileResponse = await fetch('https://ai-news-image-maker.onrender.com/api/auth/profile', {
-          headers: {
-            'Authorization': `Bearer ${data.data.token}`
-          }
-        });
-        
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-          if (profileData.success && profileData.data) {
-            console.log('✅ User profile fetched from database:', profileData.data);
-            setUser(profileData.data);
-            return { 
-              success: true, 
-              message: data.message,
-              user: profileData.data 
-            };
-          }
+        // Use user data from login response if available (faster)
+        if (data.data.user) {
+          console.log('✅ Using user data from login response');
+          setUser(data.data.user);
+          return { 
+            success: true, 
+            message: data.message,
+            user: data.data.user 
+          };
         }
         
-        // Fallback: derive user from token if DB profile not available
-        console.log('⚠️ Profile fetch failed, using token claims');
+        // Fallback: derive user from token if no user data in response
+        console.log('⚠️ No user data in response, using token claims');
         const minimalUser = getUserFromToken(data.data.token);
-        setUser(minimalUser || data.data.user || null);
+        setUser(minimalUser || null);
         return { 
           success: true, 
           message: data.message,
-          user: minimalUser || data.data.user 
+          user: minimalUser 
         };
       } else {
         console.log('❌ Login failed:', data.message);
@@ -161,7 +144,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password) => {
     try {
       console.log('Attempting registration with backend API:', email);
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/auth/register', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,9 +205,9 @@ export const AuthProvider = ({ children }) => {
     if (!token) return;
     
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/credits/balance', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/credits/balance`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 

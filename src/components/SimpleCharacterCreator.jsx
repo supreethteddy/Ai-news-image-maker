@@ -10,6 +10,8 @@ import { Camera, Upload, Image as ImageIcon, Loader2, Plus, Wand2 } from 'lucide
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 const SimpleCharacterCreator = ({ onCharacterCreated }) => {
   const { token, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -34,6 +36,11 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
+      if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
+        toast.error('Unsupported image format. Please upload JPEG, PNG, or WEBP.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
       setFormData(prev => ({ ...prev, imageFile: file }));
       
       // Create preview URL
@@ -92,14 +99,20 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
   const uploadImage = async () => {
     if (!formData.imageFile) return null;
 
+    if (!SUPPORTED_IMAGE_TYPES.has(formData.imageFile.type)) {
+      toast.error('Unsupported image format. Please upload JPEG, PNG, or WEBP.');
+      return null;
+    }
+
     const uploadFormData = new FormData();
     uploadFormData.append('image', formData.imageFile);
 
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/upload/character-image', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(apiUrl + '/upload/character-image', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
         body: uploadFormData
       });
@@ -119,56 +132,50 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
     }
   };
 
-  const generateCharacter = async () => {
-    if (!formData.name || !formData.prompt) {
-      toast.error('Please fill in character name and prompt');
+  const createCharacter = async () => {
+    if (!formData.name) {
+      toast.error('Please provide a character name');
+      return;
+    }
+    if (!formData.imageFile && !formData.imageUrl) {
+      toast.error('Please upload or capture a character image');
       return;
     }
 
-    console.log('Starting character generation with data:', formData);
     setLoading(true);
     try {
-      let imageUrl = null;
-      
-      // Upload image if provided
+      let uploadedImageUrl = formData.imageUrl;
+
+      // Upload image if we have a file
       if (formData.imageFile) {
-        console.log('Uploading image...');
-        imageUrl = await uploadImage();
-        console.log('Image uploaded, URL:', imageUrl);
+        uploadedImageUrl = await uploadImage();
+        if (!uploadedImageUrl) throw new Error('Image upload failed');
       }
 
-      // Generate character with Ideogram API
-      console.log('Calling character generation API...');
-      const requestData = {
+      const payload = {
         name: formData.name,
-        prompt: formData.prompt,
-        style: formData.style,
-        imageUrl: imageUrl // This will be used as character_reference_images
+        description: formData.prompt || '',
+        imageUrl: uploadedImageUrl
       };
-      console.log('Request data:', requestData);
 
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/characters/generate-image', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(apiUrl + '/characters', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(payload)
       });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Character created successfully:', data);
         toast.success('Character created successfully!');
         onCharacterCreated?.(data.data);
         setIsOpen(false);
         resetForm();
       } else {
         const errorData = await response.json();
-        console.error('API Error:', errorData);
         toast.error(`Failed to create character: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
@@ -259,7 +266,7 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,.jpeg,.png,.webp"
               onChange={handleFileUpload}
               className="hidden"
             />
@@ -340,8 +347,8 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <Button
-              onClick={generateCharacter}
-              disabled={loading || !formData.name || !formData.prompt}
+              onClick={createCharacter}
+              disabled={loading || !formData.name || (!formData.imageFile && !formData.imageUrl)}
               className="flex-1"
             >
               {loading ? (
@@ -352,7 +359,7 @@ const SimpleCharacterCreator = ({ onCharacterCreated }) => {
               ) : (
                 <>
                   <ImageIcon className="w-4 h-4 mr-2" />
-                  Generate Character
+                  Create Character
                 </>
               )}
             </Button>

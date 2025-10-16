@@ -29,9 +29,9 @@ export default function TemplatesSidebar({ onTemplateSelect, onClose }) {
 
     setIsLoading(true);
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/styling-templates', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/styling-templates`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 
@@ -59,10 +59,10 @@ export default function TemplatesSidebar({ onTemplateSelect, onClose }) {
     }
 
     try {
-      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/styling-templates/${templateId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/styling-templates/${templateId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 

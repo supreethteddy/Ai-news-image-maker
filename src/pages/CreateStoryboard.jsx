@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sparkles, Loader2, Wand2, BookOpenText, ArrowRight, Info, Palette, Layout, Building2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import StoryboardDisplay from "../components/storyboard/StoryboardDisplay";
@@ -21,6 +22,7 @@ import CreditBalance from "../components/ui/CreditBalance";
 import LowCreditWarning from "../components/ui/LowCreditWarning";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { buildMasterPrompt, buildNegativePrompt, enhanceSceneForCharacter } from "@/utils/masterPrompting";
 
 export default function CreateStoryboard() {
   const [originalText, setOriginalText] = useState("");
@@ -35,6 +37,7 @@ export default function CreateStoryboard() {
   const [showBrandProfiles, setShowBrandProfiles] = useState(false);
   const [showCreateBrand, setShowCreateBrand] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState(null);
+  const [sceneCount, setSceneCount] = useState(6);
   const { isAuthenticated, token, user, logout, credits, refreshCredits } = useAuth();
 
   // Character consistency helper
@@ -81,10 +84,8 @@ export default function CreateStoryboard() {
     }
   };
 
-  // Smart prompt builder with FIXED length management
+  // Enhanced master prompt builder with character-focused approach
   const buildOptimizedPrompt = (scenePrompt, characterRef, visualStyle, colorTheme, logoUrl = null, includeLogo = false) => {
-    const MAX_PROMPT_LENGTH = 400; // Increased for better context
-    
     // Ensure all inputs are safe strings
     const safeScenePrompt = String(scenePrompt || "").trim();
     const safeCharacterRef = String(characterRef || "").trim();
@@ -92,52 +93,82 @@ export default function CreateStoryboard() {
     const safeColorTheme = String(colorTheme || "modern").trim();
 
     if (!safeScenePrompt) {
-      return "a detailed scene, high quality, professional";
+      return buildMasterPrompt({
+        basePrompt: "detailed professional scene",
+        type: "storyboard",
+        visualStyle: safeVisualStyle,
+        colorTheme: safeColorTheme
+      });
     }
 
-    // Get style and color modifiers
-    const styleData = VISUAL_STYLES.find(s => s.key === safeVisualStyle) || VISUAL_STYLES[0];
-    const colorData = COLOR_THEMES.find(c => c.key === safeColorTheme) || COLOR_THEMES[0];
+    // If a character is selected, use character-focused prompting
+    if (selectedCharacter) {
+      console.log("Using character-focused prompting for:", selectedCharacter.name);
+      
+      // Build logo context
+      const logoContext = (logoUrl && includeLogo) ? "company logo in bottom-right corner" : "";
+      
+      // Use specialized character scene enhancement
+      const characterPrompt = enhanceSceneForCharacter(
+        safeScenePrompt,
+        selectedCharacter,
+        {
+          visualStyle: safeVisualStyle,
+          colorTheme: safeColorTheme,
+          lighting: {
+            warm: "golden",
+            cool: "natural", 
+            vibrant: "dramatic",
+            muted: "soft",
+            monochrome: "dramatic",
+            modern: "natural"
+          }[safeColorTheme] || "natural"
+        }
+      );
 
-    const styleModifier = (styleData?.prompt || "high quality, detailed");
-    const colorModifier = (colorData?.prompt || "balanced colors");
-    
-    // Add logo context if available and user wants it included
-    const logoContext = (logoUrl && includeLogo) ? " with company logo in top-left corner" : "";
-
-    // Build prompt with better structure for context
-    let prompt = safeScenePrompt;
-    
-    // Ensure we have enough room for all modifiers
-    const availableLength = MAX_PROMPT_LENGTH - 100; // Reserve space for modifiers
-    if (prompt.length > availableLength) {
-      prompt = prompt.substring(0, availableLength);
-      // Try to end at a word boundary
-      const lastSpace = prompt.lastIndexOf(' ');
-      if (lastSpace > availableLength - 50) {
-        prompt = prompt.substring(0, lastSpace);
+      // Add logo context if needed
+      if (logoContext) {
+        return `${characterPrompt}. ${logoContext}`;
       }
+      
+      return characterPrompt;
     }
 
-    // Add character reference for consistency
-    if (safeCharacterRef && prompt.length + safeCharacterRef.length + 100 < MAX_PROMPT_LENGTH) {
-      const shortCharRef = safeCharacterRef.substring(0, 60);
-      prompt += `. Character: ${shortCharRef}`;
-    }
+    // Fallback to standard master prompting for non-character scenes
+    const lightingMap = {
+      warm: "golden",
+      cool: "natural", 
+      vibrant: "dramatic",
+      muted: "soft",
+      monochrome: "dramatic",
+      modern: "natural"
+    };
+    
+    const lighting = lightingMap[safeColorTheme] || "natural";
+    
+    // Determine mood based on content
+    const mood = safeScenePrompt.toLowerCase().includes('action') || 
+                 safeScenePrompt.toLowerCase().includes('dramatic') ? 
+                 "dramatic" : "professional";
 
-    // Add style and color with better formatting
-    prompt += `. Style: ${styleModifier}. Colors: ${colorModifier}${logoContext}`;
+    // Build logo context
+    const logoContext = (logoUrl && includeLogo) ? "company logo in bottom-right corner" : "";
 
-    // Final length guard
-    if (prompt.length > MAX_PROMPT_LENGTH) {
-      prompt = prompt.substring(0, MAX_PROMPT_LENGTH - 10);
-      const cut = prompt.lastIndexOf(' ');
-      if (cut > MAX_PROMPT_LENGTH - 50) {
-        prompt = prompt.substring(0, cut);
-      }
-    }
+    // Use standard master prompting system
+    const masterPrompt = buildMasterPrompt({
+      basePrompt: safeScenePrompt,
+      type: "storyboard",
+      visualStyle: safeVisualStyle,
+      colorTheme: safeColorTheme,
+      characterRef: safeCharacterRef,
+      logoContext: logoContext,
+      mood: mood,
+      cameraAngle: "medium shot",
+      lighting: lighting,
+      priority: "quality"
+    });
 
-    return prompt.trim();
+    return masterPrompt;
   };
 
   const handleCreativeBriefComplete = (briefData) => {
@@ -151,6 +182,7 @@ export default function CreateStoryboard() {
       visualStyle: templateData.visual_style || templateData.visualStyle,
       colorTheme: templateData.color_theme || templateData.colorTheme,
       logoUrl: templateData.logo_url || templateData.logoUrl,
+      includeLogo: Boolean(templateData.logo_url || templateData.logoUrl),
       description: templateData.description
     });
     setShowTemplates(false);
@@ -159,6 +191,12 @@ export default function CreateStoryboard() {
 
   const handleBrandSelect = (brandData) => {
     setSelectedBrand(brandData);
+    // If no logo set from brief, use brand's logo by default and include it
+    setCreativeBriefData(prev => ({
+      ...(prev || {}),
+      logoUrl: (prev?.logoUrl) ? prev.logoUrl : (brandData.logo_url || brandData.logoUrl || prev?.logoUrl || null),
+      includeLogo: (prev?.includeLogo !== undefined) ? prev.includeLogo : Boolean(brandData.logo_url || brandData.logoUrl)
+    }));
     setShowBrandProfiles(false);
     toast.success(`Brand profile "${brandData.brand_name}" selected!`);
   };
@@ -184,11 +222,11 @@ export default function CreateStoryboard() {
     }
 
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/storyboards', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/storyboards`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify({
           title: storyboardData.title,
@@ -200,7 +238,8 @@ export default function CreateStoryboard() {
             image_url: part.image_url // Fixed: Use snake_case
           })),
           character_id: selectedCharacter?.id, // Fixed: Use snake_case
-          visual_style: creativeBriefData?.visualStyle || 'realistic' // Fixed: Use snake_case
+          visual_style: creativeBriefData?.visualStyle || 'realistic', // Fixed: Use snake_case
+          scene_count: sceneCount // Add scene count to backend
         })
       });
 
@@ -245,10 +284,10 @@ export default function CreateStoryboard() {
       return;
     }
 
-    // Check if user has sufficient credits
-    if (credits !== null && credits < 1) {
-      setErrorMessage("You don't have enough credits to generate a storyboard. You need 1 credit per storyboard.");
-      toast.error("Insufficient credits! You need 1 credit to generate a storyboard.");
+    // Check if user has sufficient credits based on scene count
+    if (credits !== null && credits < sceneCount) {
+      setErrorMessage(`You don't have enough credits to generate a storyboard. You need ${sceneCount} credits for ${sceneCount} scenes, but you only have ${credits} credits.`);
+      toast.error(`Insufficient credits! You need ${sceneCount} credits for ${sceneCount} scenes.`);
       return;
     }
 
@@ -261,19 +300,50 @@ export default function CreateStoryboard() {
     try {
       console.log("Starting story analysis...");
 
-      // Step 1: AI analysis
+      // Step 1: AI analysis with ULTRA STRONG character focus
+      const characterInstruction = selectedCharacter ? 
+        `
+          ⚠️ ABSOLUTE MANDATORY CHARACTER REQUIREMENT - NON-NEGOTIABLE ⚠️
+          
+          Selected Character: ${selectedCharacter.name}
+          Physical Description: ${selectedCharacter.appearance || 'Consistent visual identity required'}
+          Personality: ${selectedCharacter.personality || 'professional'}
+          
+          STRICT RULES - NO EXCEPTIONS:
+          1. ${selectedCharacter.name} MUST be the PRIMARY SUBJECT in ALL ${sceneCount} scenes - NO EXCEPTIONS
+          2. ${selectedCharacter.name} MUST be VISIBLE, IN FOCUS, and PROMINENTLY PLACED in EVERY SINGLE image_prompt
+          3. EVERY image_prompt MUST start by mentioning ${selectedCharacter.name} as the main subject
+          4. ${selectedCharacter.name} must maintain IDENTICAL appearance across all ${sceneCount} scenes
+          5. NO scene can exclude ${selectedCharacter.name} - character visibility is MANDATORY
+          6. ${selectedCharacter.name} should be in the CENTER or FOREGROUND of every composition
+          7. Each image_prompt must explicitly state "${selectedCharacter.name} is prominently featured"
+          
+          FORMAT REQUIREMENT for image_prompt:
+          Start each image_prompt with: "${selectedCharacter.name} as the main character [doing action/in setting]..."
+          
+          If you generate ANY scene without ${selectedCharacter.name} as the central focus, the entire storyboard is INVALID.
+        ` : 
+        'Create detailed character descriptions if characters exist, and ensure character consistency across all scenes.';
+
       const llmResponse = await InvokeLLM({
         prompt: `
-          Analyze this story and create 6 compelling visual scenes that tell the complete story.
+          Analyze this story and create ${sceneCount} compelling visual scenes that tell the complete story.
 
-          Break down the story into 6 distinct scenes that capture the key moments, characters, and narrative flow.
+          ${characterInstruction}
+
+          Break down the story into ${sceneCount} distinct scenes that capture the key moments, characters, and narrative flow.
 
           For each scene, provide:
           1. text: 2-3 sentences describing what happens in this scene
-          2. section_title: Short engaging title (3-5 words)
-          3. image_prompt: Detailed visual description for image generation
+          2. section_title: Short engaging title (3-5 words)  
+          3. image_prompt: MUST start with character name and detailed visual description for image generation
 
-          Create detailed character descriptions if characters exist, and ensure character consistency across all scenes.
+          ${selectedCharacter ? `
+          ⚠️ REMINDER: Every single image_prompt must begin with "${selectedCharacter.name} as the main character" followed by the scene description.
+          Example format: "${selectedCharacter.name} as the main character standing confidently in a modern office..."
+          
+          Character MUST be in EVERY scene. Character MUST be PROMINENT. Character MUST be CONSISTENT.
+          ` : ''}
 
           Story: ${textToProcess}
         `,
@@ -284,8 +354,8 @@ export default function CreateStoryboard() {
             character_persona: { type: "string" },
             storyboard_parts: {
               type: "array",
-              minItems: 6,
-              maxItems: 6,
+              minItems: sceneCount,
+              maxItems: sceneCount,
               items: {
                 type: "object",
                 properties: {
@@ -307,11 +377,11 @@ export default function CreateStoryboard() {
         throw new Error("AI could not process your story. Please try a different approach.");
       }
 
-      // Ensure we have exactly 6 parts
-      if (llmResponse.storyboard_parts.length < 6) {
-        console.warn(`Only got ${llmResponse.storyboard_parts.length} parts instead of 6. Padding with additional scenes.`);
-        // Add placeholder parts if we got fewer than 6
-        while (llmResponse.storyboard_parts.length < 6) {
+      // Ensure we have exactly the requested number of parts
+      if (llmResponse.storyboard_parts.length < sceneCount) {
+        console.warn(`Only got ${llmResponse.storyboard_parts.length} parts instead of ${sceneCount}. Padding with additional scenes.`);
+        // Add placeholder parts if we got fewer than requested
+        while (llmResponse.storyboard_parts.length < sceneCount) {
           const partIndex = llmResponse.storyboard_parts.length + 1;
           llmResponse.storyboard_parts.push({
             text: `Scene ${partIndex}: Additional scene to complete the story.`,
@@ -328,6 +398,7 @@ export default function CreateStoryboard() {
         character_persona: String(llmResponse.character_persona || ""),
         visual_style: String(creativeBriefData?.visualStyle || "realistic"),
         color_theme: String(creativeBriefData?.colorTheme || "modern"),
+        scene_count: sceneCount, // Add scene count to local data
         storyboard_parts: llmResponse.storyboard_parts.map(part => ({
           text: String(part.text || ""),
           image_prompt: String(part.image_prompt || ""),
@@ -377,8 +448,9 @@ export default function CreateStoryboard() {
               characterRef,
               creativeBriefData?.visualStyle || "realistic",
               creativeBriefData?.colorTheme || "modern",
-              creativeBriefData?.logoUrl,
-              creativeBriefData?.includeLogo
+              // Prefer brief logo; fallback to selected brand logo
+              (creativeBriefData?.logoUrl || selectedBrand?.logo_url || selectedBrand?.logoUrl),
+              (creativeBriefData?.includeLogo ?? Boolean(selectedBrand?.logo_url || selectedBrand?.logoUrl))
             );
 
             console.log(`Optimized prompt: ${optimizedPrompt}`);
@@ -392,19 +464,24 @@ export default function CreateStoryboard() {
               null;
             const characterReferenceImages = referenceUrl ? [referenceUrl] : [];
 
+          // Generate negative prompt for better results, enhanced for character consistency
+          const negativePrompt = buildNegativePrompt("storyboard", Boolean(selectedCharacter));
+
           const imageResult = await runwareImageGeneration({ 
             prompt: optimizedPrompt,
+            negativePrompt: negativePrompt,
             visualStyle: creativeBriefData?.visualStyle || 'realistic',
             colorTheme: creativeBriefData?.colorTheme || 'modern',
             options: {
               visualStyle: creativeBriefData?.visualStyle || 'realistic',
               colorTheme: creativeBriefData?.colorTheme || 'modern',
               storyboardId: createdStory?.id || null,
-              sceneIndex: i
+              sceneIndex: i,
+              negativePrompt: negativePrompt
             },
             characterReferenceImages: characterReferenceImages,
-            logoUrl: creativeBriefData?.logoUrl || undefined,
-            includeLogo: Boolean(creativeBriefData?.includeLogo)
+            logoUrl: (creativeBriefData?.logoUrl || selectedBrand?.logo_url || selectedBrand?.logoUrl) || undefined,
+            includeLogo: Boolean(creativeBriefData?.includeLogo ?? (selectedBrand?.logo_url || selectedBrand?.logoUrl))
           });
 
             console.log(`Image result for part ${i + 1}:`, imageResult);
@@ -491,6 +568,9 @@ export default function CreateStoryboard() {
               storyboard_parts: finalStoryboard.storyboard_parts
             });
             toast.success('Storyboard saved successfully!');
+            
+            // Refresh credits immediately after story completion
+            await refreshCredits();
           } catch (updateError) {
             console.log("Could not update story completion in database:", updateError.message);
           }
@@ -720,6 +800,53 @@ export default function CreateStoryboard() {
                 <p className="text-xs md:text-sm text-slate-500 px-1">
                   🎭 Select a character to ensure consistent visual appearance across all storyboard images.
                 </p>
+              </div>
+
+              {/* Scene Count Selection - Optional */}
+              <div className="space-y-3">
+                <Label className="text-slate-700 font-semibold text-base md:text-lg">
+                  Number of Scenes <span className="text-slate-500 font-normal">(Optional)</span>
+                </Label>
+                <Select value={sceneCount.toString()} onValueChange={(value) => setSceneCount(parseInt(value))}>
+                  <SelectTrigger className="w-full border-slate-300 focus:border-purple-500 focus:ring-purple-500">
+                    <SelectValue placeholder="Select number of scenes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">3 Scenes - Quick Overview</SelectItem>
+                    <SelectItem value="4">4 Scenes - Standard Story</SelectItem>
+                    <SelectItem value="5">5 Scenes - Detailed Narrative</SelectItem>
+                    <SelectItem value="6">
+                      <div className="flex items-center gap-2">
+                        6 Scenes - Comprehensive
+                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-medium">Recommended</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="8">8 Scenes - In-Depth Analysis</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs md:text-sm text-slate-500 px-1">
+                  📊 Choose how many visual scenes to create from your story. More scenes = more detailed storytelling. Each scene costs 1 credit. Default is 6 scenes.
+                </p>
+                
+                {/* Current Selection Indicator */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm text-blue-700 font-medium">
+                        Will create {sceneCount} scene{sceneCount !== 1 ? 's' : ''} from your story
+                      </span>
+                    </div>
+                    {isAuthenticated && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-blue-600">Cost:</span>
+                        <span className="text-sm font-semibold text-blue-800">
+                          {sceneCount} credit{sceneCount !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {!isAuthenticated && (

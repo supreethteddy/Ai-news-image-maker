@@ -4,15 +4,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import storageService from './storageService.js';
 import LogoOverlayService from './logoOverlayService.js';
+import { buildMasterPrompt, buildNegativePrompt } from '../utils/masterPrompting.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Gemini AI Service for LLM operations
 export class GeminiService {
-  static async generateStoryboard(articleText, brandPreferences = {}) {
+  static async generateStoryboard(articleText, brandPreferences = {}, sceneCount = 6) {
     try {
-      const prompt = this.buildStoryboardPrompt(articleText, brandPreferences);
+      const prompt = this.buildStoryboardPrompt(articleText, brandPreferences, sceneCount);
       
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -79,11 +80,11 @@ export class GeminiService {
     }
   }
 
-  static buildStoryboardPrompt(articleText, brandPreferences) {
+  static buildStoryboardPrompt(articleText, brandPreferences, sceneCount = 6) {
     const { visualStyle = 'realistic', colorTheme = 'modern', brandPersonality = '', targetAudience = '' } = brandPreferences;
     
     return `
-Create a visual storyboard for this article. Break it down into 3-6 compelling scenes.
+Create a visual storyboard for this article. Break it down into ${sceneCount} compelling scenes.
 
 Article: ${articleText}
 
@@ -171,7 +172,21 @@ Return only the enhanced prompt, nothing else.
 export class IdeogramService {
   static async generateImage(prompt, options = {}) {
     try {
-      console.log('Generating image with prompt:', prompt);
+      // Enhance prompt with master prompting techniques
+      const enhancedPrompt = buildMasterPrompt({
+        basePrompt: prompt,
+        type: options.type || "storyboard",
+        visualStyle: options.visual_style || options.style || "realistic",
+        characterRef: options.character_ref || "",
+        lighting: options.lighting || "natural",
+        priority: "quality"
+      });
+
+      // Generate negative prompt
+      const negativePrompt = options.negativePrompt || buildNegativePrompt(options.type || "storyboard");
+
+      console.log('Generating image with enhanced prompt:', enhancedPrompt);
+      console.log('Using negative prompt:', negativePrompt);
       
       // Determine style type from options and map to Ideogram enums
       const normalizeStyle = (value) => {
@@ -215,7 +230,8 @@ export class IdeogramService {
         const FormData = (await import('form-data')).default;
         const formData = new FormData();
 
-        formData.append('prompt', prompt);
+        formData.append('prompt', enhancedPrompt);
+        formData.append('negative_prompt', negativePrompt);
         formData.append('rendering_speed', 'TURBO');
         formData.append('num_images', '1');
         formData.append('aspect_ratio', options?.aspect_ratio || '16x9');
@@ -348,7 +364,8 @@ export class IdeogramService {
 
       // Fallback: JSON request without character reference
       const response = await axios.post('https://api.ideogram.ai/v1/ideogram-v3/generate', {
-        prompt: prompt,
+        prompt: enhancedPrompt,
+        negative_prompt: negativePrompt,
         rendering_speed: 'TURBO',
         num_images: 1,
         style_type: styleType,

@@ -32,9 +32,9 @@ export default function MyStoryboards() {
 
     setIsLoading(true);
     try {
-      const response = await fetch('https://ai-news-image-maker.onrender.com/api/storyboards', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/storyboards`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 
@@ -65,10 +65,10 @@ export default function MyStoryboards() {
     }
 
     try {
-      const response = await fetch(`https://ai-news-image-maker.onrender.com/api/storyboards/${storyboardId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/storyboards/${storyboardId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
 

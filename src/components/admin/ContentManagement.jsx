@@ -75,9 +75,9 @@ export default function ContentManagement() {
     
     try {
       // Load storyboards
-      const storyboardsResponse = await fetch('https://ai-news-image-maker.onrender.com/api/admin/content/storyboards', {
+      const storyboardsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/admin/content/storyboards`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
       
@@ -95,9 +95,9 @@ export default function ContentManagement() {
       }
 
       // Load templates
-      const templatesResponse = await fetch('https://ai-news-image-maker.onrender.com/api/styling-templates', {
+      const templatesResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/styling-templates`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
       
@@ -110,9 +110,9 @@ export default function ContentManagement() {
       }
 
       // Load characters
-      const charactersResponse = await fetch('https://ai-news-image-maker.onrender.com/api/characters', {
+      const charactersResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/characters`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': 'Bearer ' + token
         }
       });
       

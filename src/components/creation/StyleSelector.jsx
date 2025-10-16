@@ -7,7 +7,7 @@ const VISUAL_STYLES = [
   { 
     key: "general", 
     name: "General", 
-    description: "Balanced, default Ideogram look", 
+    description: "Balanced, default look", 
     prompt: "balanced, high quality, detailed",
     icon: "✨",
     bgGradient: "from-slate-200 to-slate-400"

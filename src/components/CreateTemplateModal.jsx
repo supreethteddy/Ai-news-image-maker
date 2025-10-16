@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 const VISUAL_STYLES = [
-  { value: 'general', label: 'General', description: 'Balanced, default Ideogram look' },
+  { value: 'general', label: 'General', description: 'Balanced, default look' },
   { value: 'realistic', label: 'Realistic', description: 'Photorealistic, professional photography' },
   { value: 'stylized', label: 'Stylized', description: 'Artistic, creative interpretation' },
   { value: 'design', label: 'Design', description: 'Clean, modern design aesthetic' },

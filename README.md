@@ -4,7 +4,7 @@ NewsPlay is an innovative AI-powered application that transforms text articles i
 
 ## 🚀 Features
 
-- **AI-Powered Storyboard Generation**: Transform any text article into a visual storyboard
+- **AI-Powered Storyboard Generation**: Transform any text article into a visual storyboard 
 - **Real AI Image Generation**: High-quality images generated using Ideogram AI
 - **Brand Consistency**: Maintain character consistency and visual styles across all images
 - **Modern UI**: Clean, intuitive interface built with React and Tailwind CSS

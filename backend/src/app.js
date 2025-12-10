@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import axios from 'axios';
 
 // Import routes
 import storyRoutes from './routes/stories.js';
@@ -31,15 +32,26 @@ const PORT = process.env.PORT || 3001;
 // Security middleware
 app.use(helmet());
 
-// CORS configuration (hardcoded frontend URL for production)
+// CORS configuration - supports both local and production
 const allowedOrigins = [
-  'https://ai-news-image-maker.vercel.app', // production frontend on Vercel
-  'http://localhost:5173',                  // local dev
-  'http://localhost:5174'
-];
+  process.env.FRONTEND_URL,              // Production frontend URL
+  'http://localhost:5173',               // Local dev (Vite default)
+  'http://localhost:5174',               // Local dev (alternative port)
+  'http://localhost:3000',               // Local dev (alternative)
+  'https://ai-news-image-maker.vercel.app' // Vercel production (fallback)
+].filter(Boolean); // Remove any undefined/null values
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin) || allowedOrigins.length === 0) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -113,12 +125,54 @@ app.get('/', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
+// Self-ping mechanism to prevent Render from sleeping
+function startSelfPing() {
+  // Get the server URL from environment or use localhost
+  const serverUrl = process.env.SERVER_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  const healthEndpoint = `${serverUrl}/health`;
+  
+  console.log(`🔄 Self-ping enabled: Pinging ${healthEndpoint} every 30 seconds`);
+  
+  // Ping immediately on start
+  const ping = async () => {
+    try {
+      const response = await axios.get(healthEndpoint, {
+        headers: {
+          'User-Agent': 'NewsPlay-SelfPing/1.0'
+        },
+        timeout: 5000 // 5 second timeout
+      });
+      
+      if (response.status === 200) {
+        const data = response.data;
+        console.log(`✅ Self-ping successful: ${data.status} (uptime: ${Math.floor(data.uptime)}s)`);
+      } else {
+        console.warn(`⚠️ Self-ping returned status: ${response.status}`);
+      }
+    } catch (error) {
+      // Don't log errors in production to avoid spam
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ Self-ping error:', error.message);
+      }
+    }
+  };
+  
+  // Ping immediately
+  ping();
+  
+  // Then ping every 30 seconds
+  setInterval(ping, 30000); // 30 seconds = 30000ms
+}
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 NewsPlay Backend Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🌐 Health check: http://localhost:${PORT}/health`);
   console.log(`📚 API Documentation: http://localhost:${PORT}/`);
+  
+  // Start self-ping to prevent Render from sleeping
+  startSelfPing();
 });
 
 export default app;

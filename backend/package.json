@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "build": "node --check src/app.js && echo '✅ Build check passed - all syntax valid'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

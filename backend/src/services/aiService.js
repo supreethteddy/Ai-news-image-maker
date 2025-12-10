@@ -284,13 +284,13 @@ export class BananaAIService {
       const response = await axios.post(imagenEndpoint, {
         contents: [{
           parts: [{
-            text: `Generate image (NO text/labels/captions): ${enhancedPrompt}\n\nAvoid: ${negativePrompt}`
+            text: `Generate a photorealistic image: ${enhancedPrompt}\n\nNegative prompt (avoid these): ${negativePrompt}`
           }]
         }],
         generationConfig: {
-          temperature: 0.2,
-          topK: 16,
-          topP: 0.8,
+          temperature: 0.4,
+          topK: 32,
+          topP: 1,
           maxOutputTokens: 4096
         }
       }, {

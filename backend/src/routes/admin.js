@@ -639,8 +639,8 @@ router.get('/branding-public', async (req, res) => {
       success: true,
       data: {
         brandName: 'NewsPlay',
-        logoUrl: '/newsplay-logo.svg',
-        iconUrl: '/newsplay-icon.svg',
+        logoUrl: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png',
+        iconUrl: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/010e7ad72_5.png',
         poweredByUrl: 'https://staibletech.com',
         footerText: 'Powered by StaiblTech',
         primaryFrom: '#6366f1',
@@ -665,8 +665,8 @@ router.get('/branding', authenticateToken, requireAdminAccess, async (req, res) 
       success: true,
       data: {
         brandName: 'NewsPlay',
-        logoUrl: '/newsplay-logo.svg',
-        iconUrl: '/newsplay-icon.svg',
+        logoUrl: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png',
+        iconUrl: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/010e7ad72_5.png',
         poweredByUrl: 'https://staibletech.com',
         footerText: 'Powered by StaiblTech',
         primaryFrom: '#6366f1',

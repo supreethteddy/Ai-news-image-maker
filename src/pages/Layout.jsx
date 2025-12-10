@@ -267,8 +267,17 @@ export default function Layout({ children, currentPageName }) {
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 md:w-10 h-8 md:h-10 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center">
-                    <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/010e7ad72_5.png" alt="NP" className="w-5 md:w-6 h-5 md:h-6" />
+                  <div className="w-8 md:w-10 h-8 md:h-10 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center overflow-hidden">
+                    <img 
+                      src={branding?.iconUrl || "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/010e7ad72_5.png"} 
+                      alt="NewsPlay Icon" 
+                      className="w-5 md:w-6 h-5 md:h-6 object-contain"
+                      onError={(e) => {
+                        // Fallback if icon fails to load
+                        e.target.src = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/010e7ad72_5.png";
+                        e.target.onerror = null; // Prevent infinite loop
+                      }}
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 text-xs md:text-sm truncate">NewsPlay</p>

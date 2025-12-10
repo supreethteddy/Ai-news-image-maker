@@ -937,7 +937,7 @@ export default function CreateStoryboard() {
               </div> */}
               
               {/* Fixed Scene Count Display */}
-              <div className="space-y-3">
+              {/* <div className="space-y-3">
                 <Label className="text-slate-700 font-semibold text-base md:text-lg">
                   Number of Scenes
                 </Label>
@@ -962,7 +962,7 @@ export default function CreateStoryboard() {
                 <p className="text-xs md:text-sm text-slate-500 px-1">
                   📊 Each storyboard includes 4 visual scenes. Each scene costs 1 credit.
                 </p>
-              </div>
+              </div> */}
 
               {!isAuthenticated && (
                 <motion.div

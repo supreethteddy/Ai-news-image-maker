@@ -123,16 +123,24 @@ export function buildMasterPrompt({
   // Enhanced character consistency for storyboard scenes
   if (characterRef) {
     if (forceCharacterInclusion && type === "storyboard") {
-      // Character description first
-      prompt += `. MAIN CHARACTER: ${characterRef.substring(0, 100)}`;
-      
-      // IMMEDIATE consistency enforcement - right after character description
-      let consistencyRules = ". CONSISTENCY: Same exact person in every scene - identical face, identical hair, identical body, identical age, same facial features";
-      if (maintainClothing) {
-        consistencyRules += ", same clothing";
+      // ULTRA STRONG character inclusion with maximum consistency enforcement
+      prompt += `. PRIMARY SUBJECT - MAIN CHARACTER (REQUIRED IN FRAME): ${characterRef.substring(0, 100)}`;
+      if (hasCharacterImage) {
+        let characterRequirement = ". ABSOLUTE REQUIREMENT: Character MUST be visible and prominently featured. Exact same facial features, identical hair style and color, same physical build";
+        if (maintainClothing) {
+          characterRequirement += ", same clothing style as reference image";
+        }
+        characterRequirement += ". Zero deviation from reference appearance";
+        prompt += characterRequirement;
+      } else {
+        let characterRequirement = ". ABSOLUTE REQUIREMENT: Character MUST be clearly visible and prominently featured in this scene. Consistent facial features, hair, body type";
+        if (maintainClothing) {
+          characterRequirement += ", same clothing/outfit";
+        }
+        characterRequirement += " across ALL scenes. Character is the focal point";
+        prompt += characterRequirement;
       }
-      consistencyRules += ". Character must be prominently visible and recognizable as the exact same individual";
-      prompt += consistencyRules;
+      prompt += ". Character placement: CENTER or PROMINENT POSITION in frame. Character visibility: MANDATORY";
     } else {
       prompt += `. Featured Character: ${characterRef.substring(0, 80)}`;
     }
@@ -157,6 +165,19 @@ export function buildMasterPrompt({
   if (priority === "quality") {
     const qualityMods = template.qualityModifiers.slice(0, 3).join(", ");
     prompt += `. ${qualityMods}`;
+  }
+  
+  // Add character consistency reinforcement for character-based storyboards
+  if (characterRef && forceCharacterInclusion) {
+    let consistencyRules = "CONSISTENCY RULES: Same person in every frame, identical face, same hairstyle, same body proportions";
+    
+    // Add clothing consistency only if maintainClothing is true
+    if (maintainClothing) {
+      consistencyRules += ", wearing the same outfit/clothing throughout the scene";
+    }
+    
+    consistencyRules += ", recognizable as the exact same individual, no variation in core features, character identity must be unmistakable";
+    prompt += `. ${consistencyRules}`;
   }
   
   // Add final quality enhancers

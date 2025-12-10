@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, BookOpenText, RefreshCw, Sparkles, Pencil, Check, X, Image, Download, Share2, Copy } from "lucide-react";
+import { Loader2, BookOpenText, RefreshCw, Sparkles, Pencil, Check, X, Image, Download, Share2, Copy, Archive } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { runwareImageGeneration } from "@/api/functions"; // Updated import
 import { InvokeLLM } from "@/api/integrations";
@@ -37,6 +37,41 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
     navigator.clipboard.writeText(shareUrl);
     toast.success('Share link copied to clipboard!');
     setShowSharePopover(false);
+  };
+
+  // Download all images as ZIP
+  const handleDownloadAll = async () => {
+    if (!storyboard || !storyboard.id || storyboard.id.startsWith('local_')) {
+      toast.error('Cannot download local storyboard');
+      return;
+    }
+
+    try {
+      toast.info('Preparing ZIP download...');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/storyboards/${storyboard.id}/download-all`, {
+        headers: {
+          'Authorization': 'Bearer ' + token
+        }
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${storyboard.title || 'storyboard'}-all-scenes.zip`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('All images downloaded!');
+      } else {
+        throw new Error('Download failed');
+      }
+    } catch (error) {
+      console.error('Error downloading all images:', error);
+      toast.error('Failed to download all images');
+    }
   };
 
   // Character consistency helper
@@ -461,48 +496,61 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
       className="space-y-6 md:space-y-8"
     >
       <div className="text-center mb-8 md:mb-12 px-2">
-        <div className="flex items-center justify-center gap-4 mb-3 md:mb-4">
+        <div className="flex flex-col items-center gap-4 mb-3 md:mb-4">
           <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight">
             {storyboard.title || "Your Visual Story"}
           </h1>
           
-          {/* Share Button - Only show for authenticated users, not public view */}
+          {/* Action Buttons - Prominent Share and Download All */}
           {!isPublicView && storyboard.id && !storyboard.id.startsWith('local_') && (
-            <Popover open={showSharePopover} onOpenChange={setShowSharePopover}>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="bg-white border-blue-600 text-blue-600 hover:bg-blue-50 shadow-md hover:shadow-lg transition-all duration-300"
-                >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-sm mb-2">Share this storyboard</h4>
-                    <p className="text-xs text-slate-600 mb-3">
-                      Anyone with this link can view and download this storyboard
-                    </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {/* Download All Button - Prominent */}
+              <Button 
+                onClick={handleDownloadAll}
+                size="lg"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+              >
+                <Archive className="w-5 h-5 mr-2" />
+                Download All Images (ZIP)
+              </Button>
+
+              {/* Share Button - Prominent */}
+              <Popover open={showSharePopover} onOpenChange={setShowSharePopover}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    className="bg-white border-2 border-blue-600 text-blue-600 hover:bg-blue-50 shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                  >
+                    <Share2 className="w-5 h-5 mr-2" />
+                    Share Link
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-semibold text-sm mb-2">Share this storyboard</h4>
+                      <p className="text-xs text-slate-600 mb-3">
+                        Anyone with this link can view and download this storyboard
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input 
+                        readOnly 
+                        value={storyboard.slug 
+                          ? `${window.location.origin}/${storyboard.slug}`
+                          : `${window.location.origin}/viewstoryboard?id=${storyboard.id}`
+                        }
+                        className="text-xs"
+                      />
+                      <Button onClick={handleShareStoryboard} size="sm">
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Input 
-                      readOnly 
-                      value={storyboard.slug 
-                        ? `${window.location.origin}/${storyboard.slug}`
-                        : `${window.location.origin}/viewstoryboard?id=${storyboard.id}`
-                      }
-                      className="text-xs"
-                    />
-                    <Button onClick={handleShareStoryboard} size="sm">
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+                </PopoverContent>
+              </Popover>
+            </div>
           )}
         </div>
         

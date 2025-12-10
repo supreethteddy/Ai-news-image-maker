@@ -39,6 +39,15 @@ const PROMPT_TECHNIQUES = {
     "extra limbs",
     "text overlays",
     "watermarks",
+    "text",
+    "words",
+    "letters",
+    "captions",
+    "subtitles",
+    "labels",
+    "scene markers",
+    "metadata text",
+    "timestamp",
     "duplicate subjects",
     "cropped faces",
     "poor composition",
@@ -99,7 +108,8 @@ export function buildMasterPrompt({
   priority = "quality",
   hasCharacterImage = false,
   forceCharacterInclusion = false,
-  cameraAngle = "medium shot"
+  cameraAngle = "medium shot",
+  maintainClothing = true
 }) {
   const template = MASTER_TEMPLATES[type] || MASTER_TEMPLATES.storyboard;
   const styleEnhancement = STYLE_ENHANCEMENTS[visualStyle] || STYLE_ENHANCEMENTS.realistic;
@@ -113,14 +123,16 @@ export function buildMasterPrompt({
   // Enhanced character consistency for storyboard scenes
   if (characterRef) {
     if (forceCharacterInclusion && type === "storyboard") {
-      // ULTRA STRONG character inclusion with maximum consistency enforcement
-      prompt += `. PRIMARY SUBJECT - MAIN CHARACTER (REQUIRED IN FRAME): ${characterRef.substring(0, 100)}`;
-      if (hasCharacterImage) {
-        prompt += ". ABSOLUTE REQUIREMENT: Character MUST be visible and prominently featured. Exact same facial features, identical hair style and color, same physical build, same clothing style as reference image. Zero deviation from reference appearance";
-      } else {
-        prompt += ". ABSOLUTE REQUIREMENT: Character MUST be clearly visible and prominently featured in this scene. Consistent facial features, hair, body type, and style across ALL scenes. Character is the focal point";
+      // Character description first
+      prompt += `. MAIN CHARACTER: ${characterRef.substring(0, 100)}`;
+      
+      // IMMEDIATE consistency enforcement - right after character description
+      let consistencyRules = ". CONSISTENCY: Same exact person in every scene - identical face, identical hair, identical body, identical age, same facial features";
+      if (maintainClothing) {
+        consistencyRules += ", same clothing";
       }
-      prompt += ". Character placement: CENTER or PROMINENT POSITION in frame. Character visibility: MANDATORY";
+      consistencyRules += ". Character must be prominently visible and recognizable as the exact same individual";
+      prompt += consistencyRules;
     } else {
       prompt += `. Featured Character: ${characterRef.substring(0, 80)}`;
     }
@@ -145,11 +157,6 @@ export function buildMasterPrompt({
   if (priority === "quality") {
     const qualityMods = template.qualityModifiers.slice(0, 3).join(", ");
     prompt += `. ${qualityMods}`;
-  }
-  
-  // Add character consistency reinforcement for character-based storyboards
-  if (characterRef && forceCharacterInclusion) {
-    prompt += ". CONSISTENCY RULES: Same person in every frame, identical face, same hairstyle, same body proportions, recognizable as the exact same individual, no variation in core features, character identity must be unmistakable";
   }
   
   // Add final quality enhancers
@@ -179,7 +186,13 @@ export function buildNegativePrompt(type = "storyboard", hasCharacter = false) {
   // Add character consistency negatives if character is present
   const characterNegatives = hasCharacter ? [
     "different face",
+    "different facial structure",
+    "different eyes",
+    "different nose",
     "different hair",
+    "different hair color",
+    "different hair length",
+    "different hairstyle",
     "changing appearance",
     "inconsistent clothing",
     "multiple characters with same face",
@@ -195,11 +208,18 @@ export function buildNegativePrompt(type = "storyboard", hasCharacter = false) {
     "face morphing",
     "inconsistent facial features",
     "different body type",
+    "different body proportions",
+    "different height",
+    "different build",
+    "different physique",
     "wrong hairstyle",
     "no character visible",
     "character missing",
     "character hidden",
-    "character out of frame"
+    "character out of frame",
+    "mismatched scene description",
+    "inaccurate scene depiction",
+    "wrong scene elements"
   ] : [];
   
   return [...baseNegatives, ...specificNegatives, ...characterNegatives].join(", ");

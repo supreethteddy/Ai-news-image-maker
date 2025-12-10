@@ -8,6 +8,7 @@ import AuthModal from "@/components/AuthModal.jsx";
 import { Button } from "@/components/ui/button";
 import { LogOut, User } from "lucide-react";
 import CreditBalance from "@/components/ui/CreditBalance";
+import apiClient from "@/api/client";
 // Removed: Sparkles, LayoutDashboard, Palette from 'lucide-react' as they are replaced by custom images.
 import {
   Sidebar,
@@ -46,6 +47,7 @@ export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showSplash, setShowSplash] = useState(true);
+  const [branding, setBranding] = useState(null);
   const { user, isAuthenticated, logout, loading } = useAuth();
 
   useEffect(() => {
@@ -54,6 +56,18 @@ export default function Layout({ children, currentPageName }) {
     }, 1000);
 
     return () => clearTimeout(timer);
+  }, []);
+
+  // Fetch branding data
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiClient.getPublicBranding();
+        if (res?.success) setBranding(res.data);
+      } catch (e) {
+        console.error('Failed to fetch branding:', e);
+      }
+    })();
   }, []);
 
   // Auto-redirect admin users to admin dashboard
@@ -68,11 +82,17 @@ export default function Layout({ children, currentPageName }) {
     return (
       <div className="min-h-screen flex items-center justify-center gradient-bg">
         <div className="text-center px-4">
-          <img
-            src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png"
-            alt="NewsPlay by StaiblTech"
-            className="w-48 md:w-64 h-auto mx-auto animate-pulse" />
-
+          {branding?.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt={branding.brandName || "NewsPlay by StaiblTech"}
+              className="w-48 md:w-64 h-auto mx-auto animate-pulse" />
+          ) : (
+            <img
+              src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png"
+              alt="NewsPlay by StaiblTech"
+              className="w-48 md:w-64 h-auto mx-auto animate-pulse" />
+          )}
         </div>
       </div>);
 
@@ -147,11 +167,22 @@ export default function Layout({ children, currentPageName }) {
         <Sidebar className="border-r border-slate-200/60 bg-white/80 backdrop-blur-sm">
           <SidebarHeader className="border-b border-slate-200/60 p-4 md:p-6">
             <div className="flex items-center justify-center w-full">
-              <img
-                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png"
-                alt="NewsPlay by StaiblTech" className="w-32 md:w-40 h-auto" />
-
-
+              {branding?.logoUrl ? (
+                <img
+                  src={branding.logoUrl}
+                  alt={branding.brandName || "NewsPlay by StaiblTech"}
+                  className="w-32 md:w-40 h-auto" 
+                  onError={(e) => {
+                    // Fallback if branding logo fails to load
+                    e.target.src = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png";
+                  }}
+                />
+              ) : (
+                <img
+                  src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png"
+                  alt="NewsPlay by StaiblTech" 
+                  className="w-32 md:w-40 h-auto" />
+              )}
             </div>
           </SidebarHeader>
           

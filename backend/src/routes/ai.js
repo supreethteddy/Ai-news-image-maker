@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
-import { GeminiService, IdeogramService } from '../services/aiService.js';
+import { GeminiService, BananaAIService } from '../services/aiService.js';
 
 const router = express.Router();
 
@@ -134,7 +134,7 @@ router.post('/generate-image', optionalAuth, validateImageGeneration, async (req
       sceneIndex: options.sceneIndex || 0
     };
 
-    const imageResult = await IdeogramService.generateImage(prompt, enhancedOptions);
+    const imageResult = await BananaAIService.generateImage(prompt, enhancedOptions);
 
     res.json({
       success: true,
@@ -176,7 +176,7 @@ router.post('/generate-multiple-images', optionalAuth, [
       });
     }
 
-    const imageResults = await IdeogramService.generateMultipleImages(prompts, options);
+    const imageResults = await BananaAIService.generateMultipleImages(prompts, options);
 
     res.json({
       success: true,
@@ -201,8 +201,8 @@ router.get('/models', optionalAuth, async (req, res) => {
         image_prompt_enhancement: ['gemini-1.5-flash'],
         features: ['JSON generation', 'Character consistency', 'Brand-aware prompts']
       },
-      ideogram: {
-        image_generation: ['ideogram-v1'],
+      bananaAI: {
+        image_generation: ['banana-ai-gemini-3-pro-nano'],
         supported_formats: ['png', 'jpg', 'jpeg'],
         aspect_ratios: ['1:1', '4:3', '3:2', '16:9', '9:16', '3:4', '2:3'],
         styles: ['photorealistic', 'cinematic', 'illustrated', 'sketch', 'watercolor'],
@@ -227,7 +227,7 @@ router.post('/test-connection', authenticateToken, async (req, res) => {
   try {
     const results = {
       gemini: { connected: false, error: null },
-      ideogram: { connected: false, error: null }
+      bananaAI: { connected: false, error: null }
     };
 
     // Test Gemini connection
@@ -238,12 +238,12 @@ router.post('/test-connection', authenticateToken, async (req, res) => {
       results.gemini.error = error.message;
     }
 
-    // Test Ideogram connection
+    // Test Banana AI connection
     try {
-      await IdeogramService.generateImage('Test prompt for connection check.');
-      results.ideogram.connected = true;
+      await BananaAIService.generateImage('Test prompt for connection check.');
+      results.bananaAI.connected = true;
     } catch (error) {
-      results.ideogram.error = error.message;
+      results.bananaAI.error = error.message;
     }
 
     res.json({

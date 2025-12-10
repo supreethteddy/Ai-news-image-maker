@@ -65,7 +65,9 @@ export const AuthProvider = ({ children }) => {
               const profileData = await response.json();
               if (profileData.success && profileData.data) {
                 console.log('✅ Fresh user profile fetched from database:', profileData.data);
-                setUser(profileData.data);
+                // Fix: profileData.data is wrapped in { user: {...} }, extract the user object
+                const userData = profileData.data.user || profileData.data;
+                setUser(userData);
               }
             }
           } catch (profileError) {

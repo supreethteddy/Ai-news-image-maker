@@ -249,16 +249,25 @@ router.post('/',
 
     const { title, original_text, storyboard_parts, character_id, visual_style, scene_count } = req.body;
     
-    // Calculate credits needed based on scene count
-    const creditsNeeded = scene_count || 6; // Default to 6 if not provided
+    // Calculate credits needed based on scene count (always 4 images per story)
+    const creditsNeeded = 4; // Fixed to 4 images per story
     
-    // Check if user has enough credits
-    const userCredits = await DatabaseService.getUserCredits(req.user.userId);
-    if (userCredits < creditsNeeded) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient credits. You need ${creditsNeeded} credits for ${creditsNeeded} scenes, but you only have ${userCredits} credits.`
-      });
+    // Check if user has created less than 2 storyboards (2 FREE STORIES)
+    const userStoryboards = await DatabaseService.getStoryboardsByUser(req.user.userId);
+    const storyboardCount = userStoryboards.length;
+    const isFreeStory = storyboardCount < 2; // First 2 stories are FREE
+    
+    if (!isFreeStory) {
+      // From 3rd story onwards, user must have sufficient credits
+      const userCredits = await DatabaseService.getUserCredits(req.user.userId);
+      if (userCredits < creditsNeeded) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient credits. You have used your 2 free stories. You need ${creditsNeeded} credits for ${creditsNeeded} scenes, but you only have ${userCredits} credits. Please purchase credits to continue.`,
+          freeStoriesUsed: storyboardCount,
+          requiresPayment: true
+        });
+      }
     }
 
     const storyboardData = {
@@ -267,7 +276,7 @@ router.post('/',
       storyboard_parts,
       character_id,
       style: visual_style || 'realistic',
-      scene_count: scene_count || 6, // Default to 6 if not provided
+      scene_count: scene_count || 4, // Default to 4 if not provided
       user_id: req.user.userId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -275,17 +284,26 @@ router.post('/',
 
     const storyboard = await DatabaseService.createStoryboard(storyboardData);
 
-    // Deduct credits based on scene count
-    await DatabaseService.deductCredits(req.user.userId, creditsNeeded, `Storyboard creation (${creditsNeeded} scenes)`);
-
-    // Get updated credit balance after deduction
-    const updatedUserCredits = await DatabaseService.getUserCredits(req.user.userId);
+    // Deduct credits only if this is not a free story (3rd story onwards)
+    let message;
+    let updatedUserCredits;
+    
+    if (!isFreeStory) {
+      await DatabaseService.deductCredits(req.user.userId, creditsNeeded, `Storyboard creation (${creditsNeeded} scenes)`);
+      updatedUserCredits = await DatabaseService.getUserCredits(req.user.userId);
+      message = `Storyboard saved successfully. ${creditsNeeded} credits deducted for ${creditsNeeded} scenes.`;
+    } else {
+      updatedUserCredits = await DatabaseService.getUserCredits(req.user.userId);
+      message = `Storyboard saved successfully. Free story ${storyboardCount + 1} of 2 used. No credits deducted.`;
+    }
 
     res.status(201).json({
       success: true,
       data: storyboard,
-      message: `Storyboard saved successfully. ${creditsNeeded} credits deducted for ${creditsNeeded} scenes.`,
-      userCredits: updatedUserCredits
+      message: message,
+      userCredits: updatedUserCredits,
+      isFreeStory: isFreeStory,
+      freeStoriesRemaining: isFreeStory ? (2 - storyboardCount - 1) : 0
     });
   } catch (error) {
     console.error('Error creating storyboard:', error);
@@ -443,10 +461,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Download storyboard image proxy endpoint
+// Download storyboard image proxy endpoint (with watermark)
 router.get('/:id/images/:imageIndex/download', authenticateToken, async (req, res) => {
   try {
-    const storyboard = storage.getStoryboardById(req.params.id);
+    const storyboard = await DatabaseService.getStoryboardById(req.params.id);
     
     if (!storyboard) {
       return res.status(404).json({
@@ -456,7 +474,7 @@ router.get('/:id/images/:imageIndex/download', authenticateToken, async (req, re
     }
 
     // Check if storyboard belongs to the authenticated user
-    if (storyboard.userId !== req.user.userId) {
+    if (storyboard.user_id !== req.user.userId) {
       return res.status(403).json({
         success: false,
         message: 'Access denied'
@@ -464,14 +482,14 @@ router.get('/:id/images/:imageIndex/download', authenticateToken, async (req, re
     }
 
     const imageIndex = parseInt(req.params.imageIndex);
-    if (imageIndex < 0 || imageIndex >= storyboard.storyboardParts.length) {
+    if (imageIndex < 0 || imageIndex >= storyboard.storyboard_parts.length) {
       return res.status(404).json({
         success: false,
         message: 'Image not found'
       });
     }
 
-    const imageUrl = storyboard.storyboardParts[imageIndex].imageUrl;
+    const imageUrl = storyboard.storyboard_parts[imageIndex].image_url;
     if (!imageUrl) {
       return res.status(404).json({
         success: false,
@@ -479,7 +497,8 @@ router.get('/:id/images/:imageIndex/download', authenticateToken, async (req, re
       });
     }
 
-    // Download the image from the external URL
+    // Note: Images already have watermark applied during generation
+    // Just proxy the download
     const axios = (await import('axios')).default;
     const imageResponse = await axios.get(imageUrl, {
       responseType: 'stream',
@@ -496,6 +515,84 @@ router.get('/:id/images/:imageIndex/download', authenticateToken, async (req, re
       success: false,
       message: 'Failed to download image'
     });
+  }
+});
+
+// Download all storyboard images as ZIP
+router.get('/:id/download-all', authenticateToken, async (req, res) => {
+  try {
+    const storyboard = await DatabaseService.getStoryboardById(req.params.id);
+    
+    if (!storyboard) {
+      return res.status(404).json({
+        success: false,
+        message: 'Storyboard not found'
+      });
+    }
+
+    // Check if storyboard belongs to the authenticated user
+    if (storyboard.user_id !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Import required modules
+    const axios = (await import('axios')).default;
+    const archiver = (await import('archiver')).default;
+    
+    // Set headers for ZIP download
+    const filename = `${storyboard.title.replace(/[^a-z0-9]/gi, '-')}-all-scenes.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Create ZIP archive
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Maximum compression
+    });
+
+    // Handle archiver errors
+    archive.on('error', (err) => {
+      console.error('Archive error:', err);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create ZIP archive'
+      });
+    });
+
+    // Pipe archive to response
+    archive.pipe(res);
+
+    // Download and add each image to ZIP
+    for (let i = 0; i < storyboard.storyboard_parts.length; i++) {
+      const part = storyboard.storyboard_parts[i];
+      if (part.image_url) {
+        try {
+          const imageResponse = await axios.get(part.image_url, {
+            responseType: 'arraybuffer',
+            timeout: 30000
+          });
+          
+          const imageFilename = `scene-${i + 1}-${part.section_title ? part.section_title.replace(/[^a-z0-9]/gi, '-') : 'image'}.jpg`;
+          archive.append(Buffer.from(imageResponse.data), { name: imageFilename });
+        } catch (imageError) {
+          console.error(`Error downloading image ${i + 1}:`, imageError);
+          // Continue with other images
+        }
+      }
+    }
+
+    // Finalize the archive
+    await archive.finalize();
+  } catch (error) {
+    console.error('Error creating ZIP download:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to download all images'
+      });
+    }
   }
 });
 

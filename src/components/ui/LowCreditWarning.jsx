@@ -21,7 +21,39 @@ const LowCreditWarning = ({
   const [shouldShow, setShouldShow] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [storyCount, setStoryCount] = useState(0);
   const { credits, isAuthenticated, token } = useAuth();
+
+  // Fetch storyboard count to determine free stories remaining
+  useEffect(() => {
+    const fetchStoryCount = async () => {
+      if (!isAuthenticated || !token) return;
+      
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/storyboards`, {
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            setStoryCount(data.data.length);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching story count:', error);
+      }
+    };
+    
+    fetchStoryCount();
+  }, [isAuthenticated, token]);
+
+  // Calculate free stories remaining
+  const getFreeStoriesRemaining = () => {
+    return Math.max(0, 2 - storyCount);
+  };
 
   // Check if warning should be shown
   useEffect(() => {
@@ -30,9 +62,16 @@ const LowCreditWarning = ({
       return;
     }
 
+    // Don't show warning if user still has free stories left
+    const freeStoriesLeft = getFreeStoriesRemaining();
+    if (credits === 0 && freeStoriesLeft > 0) {
+      setShouldShow(false);
+      return;
+    }
+
     const shouldWarn = credits <= threshold && (showOnZero || credits > 0);
     setShouldShow(shouldWarn && !dismissed);
-  }, [credits, threshold, showOnZero, dismissed, isAuthenticated]);
+  }, [credits, threshold, showOnZero, dismissed, isAuthenticated, storyCount]);
 
   // Reset dismissed state when credits change significantly
   useEffect(() => {

@@ -347,10 +347,10 @@ export class DatabaseService {
   // User Profiles
   static async createUserProfile(data) {
     try {
-      // Ensure new users get 10 credits by default
+      // New users start with 0 credits - they get 2 FREE stories instead
       const profileData = {
         ...data,
-        credits: data.credits || 10
+        credits: 0 // Always 0 credits for new users
       };
 
       const { data: result, error } = await supabase
@@ -361,17 +361,8 @@ export class DatabaseService {
 
       if (error) throw error;
 
-      // Log the initial credit transaction
-      if (result && result.credits > 0) {
-        await this.createCreditTransaction({
-          user_id: result.id,
-          transaction_type: 'credit',
-          amount: result.credits,
-          description: 'Initial signup bonus',
-          reference_type: 'signup'
-        });
-      }
-
+      // No initial credit transaction - users get 2 free stories instead
+      
       return result;
     } catch (error) {
       console.error('Error creating user profile:', error);

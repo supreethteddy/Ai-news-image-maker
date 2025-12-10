@@ -32,8 +32,6 @@ const AuthModal = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState("login");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
-  const [confirmationEmail, setConfirmationEmail] = useState("");
   const [showFlaggedWarning, setShowFlaggedWarning] = useState(false);
   const [flaggedReason, setFlaggedReason] = useState("");
   const [showFlaggedDialog, setShowFlaggedDialog] = useState(false);
@@ -118,14 +116,7 @@ const AuthModal = ({ isOpen, onClose }) => {
           window.location.href = "/CreateStoryboard";
         }
       } else {
-        // Check if it's an email confirmation error
-        if (result.message && result.message.includes("confirmation link")) {
-          toast.error(
-            "Please check your email and click the confirmation link before logging in."
-          );
-        } else {
-          toast.error(result.message);
-        }
+        toast.error(result.message);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -147,19 +138,15 @@ const AuthModal = ({ isOpen, onClose }) => {
         formData.password
       );
       if (result.success) {
-        // Check if email confirmation is required
-        if (result.message && result.message.includes("check your email")) {
-          setEmailConfirmationSent(true);
-          setConfirmationEmail(formData.email);
-          toast.success(
-            "Registration successful! Please check your email for confirmation."
-          );
-        } else {
-          toast.success("Account created successfully!");
-          onClose();
-          // Redirect to dashboard
-          window.location.href = "/CreateStoryboard";
-        }
+        toast.success("Account created successfully! Please sign in.");
+        // Switch to login tab after successful registration
+        setActiveTab("login");
+        // Clear password fields for security
+        setFormData((prev) => ({
+          ...prev,
+          password: "",
+          confirmPassword: "",
+        }));
       } else {
         toast.error(result.message || "Registration failed");
       }
@@ -193,8 +180,6 @@ const AuthModal = ({ isOpen, onClose }) => {
     setErrors({});
     setActiveTab("login");
     setShowPassword(false);
-    setEmailConfirmationSent(false);
-    setConfirmationEmail("");
     setShowFlaggedWarning(false);
     setFlaggedReason("");
     setShowFlaggedDialog(false);
@@ -248,19 +233,6 @@ const AuthModal = ({ isOpen, onClose }) => {
             </CardHeader>
 
             <CardContent>
-              {emailConfirmationSent && (
-                <Alert className="mb-6 border-green-200 bg-green-50">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    <strong>Email confirmation sent!</strong>
-                    <br />
-                    We&apos;ve sent a confirmation link to{" "}
-                    <strong>{confirmationEmail}</strong>. Please check your
-                    inbox and click the link to activate your account.
-                  </AlertDescription>
-                </Alert>
-              )}
-
               {showFlaggedWarning && (
                 <Alert className="mb-6 border-red-200 bg-red-50">
                   <AlertCircle className="h-4 w-4 text-red-600" />

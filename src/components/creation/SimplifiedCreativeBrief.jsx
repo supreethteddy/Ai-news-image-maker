@@ -449,80 +449,22 @@ export default function SimplifiedCreativeBrief({ onComplete, onSkip }) {
                <p className="text-xs text-slate-500 mt-2">Save this brand to reuse its style settings in the future.</p>
             </div>
 
-            {/* Logo Upload Section */}
-            <div>
-              <Label>Company Logo (Optional)</Label>
-              <div className="mt-2">
-                {logoPreview ? (
-                  <div className="flex items-center gap-4 p-4 border rounded-lg">
-                    <img src={logoPreview} alt="Logo preview" className="w-16 h-16 object-contain rounded" />
-                    <div className="flex-1">
-                      <p className="text-sm text-slate-600">Logo uploaded successfully</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setLogoPreview(null);
-                          setBriefData(prev => ({ ...prev, logoUrl: null }));
-                        }}
-                        className="mt-2"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Remove Logo
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          handleLogoUpload(file);
-                        }
-                      }}
-                      className="hidden"
-                      id="logo-upload"
-                    />
-                    <label htmlFor="logo-upload" className="cursor-pointer">
-                      <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                      <p className="text-sm text-slate-600 mb-2">Upload your company logo</p>
-                      <p className="text-xs text-slate-500">PNG, JPG up to 5MB</p>
-                    </label>
-                  </div>
-                )}
-                {uploadingLogo && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm text-slate-600">Uploading logo...</span>
-                  </div>
-                )}
-              </div>
-              
-              {/* Logo Consent Checkbox */}
-              {briefData.logoUrl && (
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      id="include-logo"
-                      checked={briefData.includeLogo}
-                      onChange={(e) => setBriefData(prev => ({ ...prev, includeLogo: e.target.checked }))}
-                      className="mt-1"
-                    />
-                    <div>
-                      <label htmlFor="include-logo" className="text-sm font-medium text-blue-900 cursor-pointer">
-                        Include logo in generated images
-                      </label>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Your logo will be placed in the bottom-right corner of all generated storyboard images
-                      </p>
-                    </div>
-                  </div>
+            {/* Logo Upload Section - DISABLED: Using fixed StaiblTech watermark */}
+            {/* Custom logo upload is now disabled. All images will have StaiblTech logo watermark automatically. */}
+
+            {/* StaiblTech Watermark Notice */}
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <Image className="w-5 h-5 text-purple-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-purple-900">
+                    🏷️ StaiblTech Watermark
+                  </p>
+                  <p className="text-xs text-purple-700 mt-1">
+                    All generated images will include the StaiblTech logo watermark in the bottom-right corner. This ensures authenticity and branding consistency.
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Description */}

@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 // Gemini AI Service for LLM operations
 export class GeminiService {
-  static async generateStoryboard(articleText, brandPreferences = {}, sceneCount = 6) {
+  static async generateStoryboard(articleText, brandPreferences = {}, sceneCount = 4) {
     try {
       const prompt = this.buildStoryboardPrompt(articleText, brandPreferences, sceneCount);
       
@@ -80,7 +80,7 @@ export class GeminiService {
     }
   }
 
-  static buildStoryboardPrompt(articleText, brandPreferences, sceneCount = 6) {
+  static buildStoryboardPrompt(articleText, brandPreferences, sceneCount = 4) {
     const { visualStyle = 'realistic', colorTheme = 'modern', brandPersonality = '', targetAudience = '' } = brandPreferences;
     
     return `
@@ -168,22 +168,70 @@ Return only the enhanced prompt, nothing else.
   }
 }
 
-// Ideogram Service for Image Generation
-export class IdeogramService {
+// Banana AI Pro Service for Image Generation (using Gemini 3 Pro Nano)
+// NOTE: The API endpoint and response structure below are placeholders.
+// Update with actual Banana AI API documentation when available.
+export class BananaAIService {
   static async generateImage(prompt, options = {}) {
     try {
       // Enhance prompt with master prompting techniques
+      // Check if character reference images are provided for consistency
+      const hasCharacterImage = options.character_reference_images && options.character_reference_images.length > 0;
+      const forceCharacterInclusion = hasCharacterImage || (options.character_ref && options.character_ref.length > 0);
+      
+      // Detect if scene prompt mentions changing clothes OR day/setting changes (for clothing consistency)
+      const sceneLower = prompt.toLowerCase();
+      
+      // Check for explicit clothing change mentions
+      const explicitClothingChange = sceneLower.includes('change clothes') || 
+                                    sceneLower.includes('different outfit') || 
+                                    sceneLower.includes('new clothes') ||
+                                    sceneLower.includes('wearing different') ||
+                                    sceneLower.includes('changed outfit') ||
+                                    sceneLower.includes('switched clothes');
+      
+      // Check for day/night transitions (clothing can change when day changes)
+      const dayKeywords = ['day', 'morning', 'afternoon', 'dawn', 'sunrise', 'daylight', 'sunny day'];
+      const nightKeywords = ['night', 'evening', 'dusk', 'sunset', 'midnight', 'dark', 'nighttime', 'late night'];
+      const timeKeywords = ['next day', 'following day', 'later that day', 'the next morning', 'that evening'];
+      
+      // Extract time indicators from the prompt
+      const hasDayTime = dayKeywords.some(keyword => sceneLower.includes(keyword));
+      const hasNightTime = nightKeywords.some(keyword => sceneLower.includes(keyword));
+      const hasTimeTransition = timeKeywords.some(keyword => sceneLower.includes(keyword));
+      
+      // Check for major setting changes that might warrant clothing change
+      const settingChangeKeywords = ['different location', 'new setting', 'another place', 'different venue', 
+                                      'indoor', 'outdoor', 'inside', 'outside', 'at home', 'at office', 
+                                      'at work', 'at event', 'at party', 'formal event', 'casual setting'];
+      const hasSettingChange = settingChangeKeywords.some(keyword => sceneLower.includes(keyword));
+      
+      // Allow clothing change if:
+      // 1. Explicitly mentioned, OR
+      // 2. Day/night transition detected, OR
+      // 3. Time transition mentioned, OR
+      // 4. Major setting change with context
+      const allowClothingChange = explicitClothingChange || 
+                                   hasTimeTransition || 
+                                   (hasDayTime && hasNightTime) || // Both day and night mentioned
+                                   (hasSettingChange && (hasDayTime || hasNightTime || hasTimeTransition));
+      
+      const maintainClothing = !allowClothingChange; // Maintain clothing unless change is justified
+      
       const enhancedPrompt = buildMasterPrompt({
         basePrompt: prompt,
         type: options.type || "storyboard",
         visualStyle: options.visual_style || options.style || "realistic",
         characterRef: options.character_ref || "",
         lighting: options.lighting || "natural",
-        priority: "quality"
+        priority: "quality",
+        hasCharacterImage: hasCharacterImage,
+        forceCharacterInclusion: forceCharacterInclusion,
+        maintainClothing: maintainClothing
       });
 
-      // Generate negative prompt
-      const negativePrompt = options.negativePrompt || buildNegativePrompt(options.type || "storyboard");
+      // Generate negative prompt with character consistency
+      const negativePrompt = options.negativePrompt || buildNegativePrompt(options.type || "storyboard", forceCharacterInclusion);
 
       console.log('Generating image with enhanced prompt:', enhancedPrompt);
       console.log('Using negative prompt:', negativePrompt);
@@ -225,66 +273,84 @@ export class IdeogramService {
       const requestedStyle = options.style_type || options.visual_style || options.style || 'GENERAL';
       let styleType = normalizeStyle(requestedStyle);
       
-      // If character reference images are provided, send as multipart/form-data with binary
-      if (options.character_reference_images && options.character_reference_images.length > 0) {
-        const FormData = (await import('form-data')).default;
-        const formData = new FormData();
-
-        formData.append('prompt', enhancedPrompt);
-        formData.append('negative_prompt', negativePrompt);
-        formData.append('rendering_speed', 'TURBO');
-        formData.append('num_images', '1');
-        formData.append('aspect_ratio', options?.aspect_ratio || '16x9');
-        formData.append('magic_prompt', options?.magic_prompt === true ? 'ON' : 'OFF');
-        // Character reference supports a limited set; fallback if unsupported
-        const crAllowed = new Set(['AUTO', 'REALISTIC', 'FICTION']);
-        formData.append('style_type', crAllowed.has(styleType) ? styleType : 'REALISTIC');
-        // Only apply style_preset for AUTO or GENERAL style types
-        const presetKey = stylePresetMap[styleType];
-        if (presetKey && (styleType === 'AUTO' || styleType === 'GENERAL')) {
-          formData.append('style_preset', presetKey);
+      // Note: Character reference images are handled via prompt engineering
+      // The character consistency is maintained through detailed prompts
+      
+      // Use Google Gemini Pro Image Preview API
+      console.log('🎨 Using Google Gemini Pro Image Preview for image generation');
+      
+      const imagenEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      
+      const response = await axios.post(imagenEndpoint, {
+        contents: [{
+          parts: [{
+            text: `Generate image (NO text/labels/captions): ${enhancedPrompt}\n\nAvoid: ${negativePrompt}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          topK: 16,
+          topP: 0.8,
+          maxOutputTokens: 4096
         }
-        // Add color theme if provided
-        if (options?.color_theme) {
-          formData.append('color_theme', String(options.color_theme).toUpperCase());
-        }
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 90000
+      });
 
-        // Load first reference image (Ideogram supports one or multiple; we pass all provided)
-        for (const imageUrl of options.character_reference_images) {
-          try {
-            let buffer;
-            if (typeof imageUrl === 'string' && imageUrl.startsWith('/uploads/')) {
-              const relativePath = imageUrl.replace('/uploads/', '');
-              const absolutePath = path.join(__dirname, '../../uploads', relativePath);
-              const fileData = await fs.readFile(absolutePath);
-              buffer = Buffer.from(fileData);
-            } else if (typeof imageUrl === 'string' && imageUrl.startsWith('https://ai-news-image-maker.onrender.com/uploads/')) {
-              const relativePath = imageUrl.replace('https://ai-news-image-maker.onrender.com/uploads/', '');
-              const absolutePath = path.join(__dirname, '../../uploads', relativePath);
-              const fileData = await fs.readFile(absolutePath);
-              buffer = Buffer.from(fileData);
-            } else {
-              const resp = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
-              buffer = Buffer.from(resp.data);
+      console.log('✅ Gemini Image API Response received');
+
+      // Handle Gemini response - it returns inlineData with base64
+      if (response.data && response.data.candidates && response.data.candidates[0]) {
+        const candidate = response.data.candidates[0];
+        const content = candidate.content;
+        
+        // Extract base64 image from parts
+        let base64Image = null;
+        if (content && content.parts) {
+          for (const part of content.parts) {
+            if (part.inlineData && part.inlineData.data) {
+              base64Image = part.inlineData.data;
+              break;
             }
-            formData.append('character_reference_images', buffer, { filename: 'character_reference.jpg', contentType: 'image/jpeg' });
-          } catch (refErr) {
-            console.error('Failed to load character reference image:', refErr);
           }
         }
-
-        const response = await axios.post('https://api.ideogram.ai/v1/ideogram-v3/generate', formData, {
-          headers: {
-            'Api-Key': process.env.IDEOGRAM_API_KEY,
-            ...formData.getHeaders()
-          },
-          timeout: 30000
-        });
-
-        console.log('Ideogram API Response:', response.data);
-
-        if (response.data && response.data.data && response.data.data[0] && response.data.data[0].url) {
-          const originalUrl = response.data.data[0].url;
+        
+        if (!base64Image) {
+          console.error('Full Gemini response:', JSON.stringify(response.data, null, 2));
+          throw new Error('No image data in Gemini response');
+        }
+        
+        // Convert base64 to buffer
+        const imageBuffer = Buffer.from(base64Image, 'base64');
+        
+        // Upload to Supabase Storage first
+        let originalUrl;
+        if (options.userId) {
+          try {
+            const uploadResult = await storageService.uploadStoryboardImageBuffer(
+              imageBuffer,
+              options.userId,
+              options.storyboardId || 'temp',
+              options.sceneIndex || 0,
+              'image/png'
+            );
+            
+            if (uploadResult.success) {
+              originalUrl = uploadResult.publicUrl;
+              console.log('✅ Image uploaded to Supabase Storage:', originalUrl);
+            } else {
+              throw new Error('Failed to upload to Supabase Storage');
+            }
+          } catch (uploadError) {
+            console.error('⚠️ Error uploading to Supabase Storage:', uploadError.message);
+            throw uploadError;
+          }
+        } else {
+          throw new Error('UserId required for image upload');
+        }
           
           // Handle logo overlay if logo is provided and user wants it included
           let processedImageUrl = originalUrl;
@@ -351,118 +417,17 @@ export class IdeogramService {
             originalUrl: originalUrl,
             metadata: {
               prompt: prompt,
-              model: 'ideogram-v3',
-              dimensions: response.data.data[0].resolution || '1024x1024',
-              style: response.data.data[0].style_type || 'GENERAL',
-              seed: response.data.data[0].seed
-            }
-          };
-        } else {
-          throw new Error('Invalid response from Ideogram API');
-        }
-      }
-
-      // Fallback: JSON request without character reference
-      const response = await axios.post('https://api.ideogram.ai/v1/ideogram-v3/generate', {
-        prompt: enhancedPrompt,
-        negative_prompt: negativePrompt,
-        rendering_speed: 'TURBO',
-        num_images: 1,
-        style_type: styleType,
-        aspect_ratio: options?.aspect_ratio || '16x9', // Fixed: Default to correct format
-        ...(stylePresetMap[styleType] && (styleType === 'AUTO' || styleType === 'GENERAL') ? { style_preset: stylePresetMap[styleType] } : {}),
-        ...(options?.color_theme ? { color_theme: String(options.color_theme).toUpperCase() } : {}),
-        // Reduce magic prompt impact to avoid overriding style
-        magic_prompt: options?.magic_prompt === true ? 'ON' : 'OFF'
-      }, {
-        headers: {
-          'Api-Key': process.env.IDEOGRAM_API_KEY,
-        	  'Content-Type': 'application/json'
-        },
-        timeout: 30000 // 30 seconds timeout
-      });
-
-      console.log('Ideogram API Response:', response.data);
-
-      if (response.data && response.data.data && response.data.data[0] && response.data.data[0].url) {
-        const originalUrl = response.data.data[0].url;
-        
-        // Handle logo overlay if logo is provided and user wants it included
-        let processedImageUrl = originalUrl;
-        if (options.logoUrl && options.includeLogo) {
-          try {
-            console.log('🎨 Applying logo overlay...');
-            const overlaidImageBuffer = await LogoOverlayService.overlayLogo(originalUrl, options.logoUrl);
-            
-            // Save the overlaid image temporarily
-            const tempFilename = `overlaid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.png`;
-            const tempFilePath = await LogoOverlayService.saveOverlaidImage(overlaidImageBuffer, tempFilename);
-            
-            // Upload the overlaid image to Supabase Storage
-            const uploadResult = await storageService.uploadStoryboardImageFromPath(
-              tempFilePath,
-              options.userId,
-              options.storyboardId || 'temp',
-              options.sceneIndex || 0,
-              'image/png'
-            );
-            
-            if (uploadResult.success) {
-              processedImageUrl = uploadResult.publicUrl;
-              console.log('✅ Logo overlay applied and uploaded:', processedImageUrl);
-            } else {
-              console.log('⚠️ Failed to upload overlaid image, using original:', uploadResult.error);
-            }
-            
-            // Clean up temporary file
-            await LogoOverlayService.cleanup(tempFilePath);
-            
-          } catch (overlayError) {
-            console.log('⚠️ Error applying logo overlay:', overlayError.message);
-            // Continue with original image if overlay fails
-          }
-        }
-        
-        // Upload to Supabase Storage if userId is provided and no logo overlay was applied
-        let finalUrl = processedImageUrl;
-        if (options.userId && (!options.logoUrl || !options.includeLogo)) {
-          try {
-            console.log('📤 Uploading generated image to Supabase Storage...');
-            const uploadResult = await storageService.uploadStoryboardImage(
-              processedImageUrl,
-              options.userId,
-              options.storyboardId || 'temp',
-              options.sceneIndex || 0
-            );
-            
-            if (uploadResult.success) {
-              console.log('✅ Image uploaded to Supabase Storage:', uploadResult.publicUrl);
-              finalUrl = uploadResult.publicUrl;
-            } else {
-              console.log('⚠️ Failed to upload to Supabase Storage, using original URL:', uploadResult.error);
-            }
-          } catch (uploadError) {
-            console.log('⚠️ Error uploading to Supabase Storage:', uploadError.message);
-          }
-        }
-        
-        return {
-          success: true,
-          url: finalUrl,
-          originalUrl: originalUrl,
-          metadata: {
-            prompt: prompt,
-            model: 'ideogram-v3',
-            dimensions: response.data.data[0].resolution || '1024x1024',
-            style: response.data.data[0].style_type || 'GENERAL',
-            seed: response.data.data[0].seed
+              model: 'google-gemini-imagen-3',
+              dimensions: options?.aspect_ratio === '16x9' ? '1792x1024' : '1024x1024',
+              style: styleType || 'GENERAL'
           }
         };
       } else {
-        throw new Error('Invalid response from Ideogram API');
+        console.error('Invalid Gemini response:', JSON.stringify(response.data, null, 2));
+        throw new Error('Invalid response format from Gemini Image API');
       }
     } catch (error) {
-      console.error('Ideogram API Error:', error);
+      console.error('Banana AI API Error:', error);
       
       // Return error instead of random fallback to identify real issues
       return {
@@ -485,9 +450,11 @@ export class IdeogramService {
 
   static async getImageStatus(imageId) {
     try {
-      const response = await axios.get(`https://api.ideogram.ai/v1/images/${imageId}`, {
+      // Banana AI image status check
+      // TODO: Update with actual Banana AI endpoint when available
+      const response = await axios.get(`https://api.banana.dev/v1/images/${imageId}`, {
         headers: {
-          'Api-Key': process.env.IDEOGRAM_API_KEY
+          'Authorization': `Bearer ${process.env.GEMINI_API_KEY}`
         }
       });
 
@@ -515,13 +482,13 @@ export class OpenAIService {
 // Legacy Runware Service (kept for fallback)
 export class RunwareService {
   static async generateImage(prompt, options = {}) {
-    // Use Ideogram as primary image generation service
-    return IdeogramService.generateImage(prompt, options);
+    // Use Banana AI as primary image generation service
+    return BananaAIService.generateImage(prompt, options);
   }
 
   static async generateMultipleImages(prompts, options = {}) {
-    return IdeogramService.generateMultipleImages(prompts, options);
+    return BananaAIService.generateMultipleImages(prompts, options);
   }
 }
 
-export default { GeminiService, IdeogramService, OpenAIService, RunwareService };
+export default { GeminiService, BananaAIService, OpenAIService, RunwareService };

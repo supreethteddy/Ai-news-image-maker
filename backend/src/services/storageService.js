@@ -181,6 +181,37 @@ class StorageService {
   }
 
   // Upload storyboard image from local file
+  async uploadStoryboardImageBuffer(imageBuffer, userId, storyboardId, sceneIndex, contentType = 'image/png') {
+    try {
+      const filename = `${userId}/storyboards/${storyboardId}/scene-${sceneIndex}-${Date.now()}.png`;
+      
+      const { data, error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(filename, imageBuffer, {
+          contentType: contentType,
+          upsert: true
+        });
+
+      if (error) {
+        console.error('Supabase storage error:', error);
+        return { success: false, error: error.message };
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from(BUCKET_NAME)
+        .getPublicUrl(filename);
+
+      return {
+        success: true,
+        publicUrl: publicUrlData.publicUrl,
+        path: filename
+      };
+    } catch (error) {
+      console.error('Error uploading image buffer:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   async uploadStoryboardImageFromPath(localPath, userId, storyboardId, sceneIndex, contentType = 'image/png') {
     const filePath = this.generateFilePath('storyboards', userId, `storyboard-${storyboardId}-scene-${sceneIndex}.png`);
     return await this.uploadFromPath(localPath, filePath, contentType);

@@ -37,7 +37,7 @@ export default function CreateStoryboard() {
   const [showBrandProfiles, setShowBrandProfiles] = useState(false);
   const [showCreateBrand, setShowCreateBrand] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState(null);
-  const [sceneCount, setSceneCount] = useState(6);
+  const [sceneCount, setSceneCount] = useState(4); // Fixed to 4 images per story
   const { isAuthenticated, token, user, logout, credits, refreshCredits } = useAuth();
 
   // Character consistency helper
@@ -284,12 +284,8 @@ export default function CreateStoryboard() {
       return;
     }
 
-    // Check if user has sufficient credits based on scene count
-    if (credits !== null && credits < sceneCount) {
-      setErrorMessage(`You don't have enough credits to generate a storyboard. You need ${sceneCount} credits for ${sceneCount} scenes, but you only have ${credits} credits.`);
-      toast.error(`Insufficient credits! You need ${sceneCount} credits for ${sceneCount} scenes.`);
-      return;
-    }
+    // Note: Credit check is now done on backend considering 2 free stories per account
+    // First 2 stories are FREE, from 3rd story onwards user needs credits
 
     setIsLoading(true);
     setErrorMessage("");
@@ -413,6 +409,11 @@ export default function CreateStoryboard() {
       try {
         createdStory = await Story.create(initialStoryboardData);
         setCurrentStoryboard(createdStory);
+        
+        // Immediately refresh credits/free stories count to update UI in real-time
+        if (refreshCredits) {
+          refreshCredits();
+        }
       } catch (authError) {
         console.log("Not authenticated, creating local storyboard...");
         // Create a local storyboard without saving to database
@@ -480,8 +481,10 @@ export default function CreateStoryboard() {
               negativePrompt: negativePrompt
             },
             characterReferenceImages: characterReferenceImages,
-            logoUrl: (creativeBriefData?.logoUrl || selectedBrand?.logo_url || selectedBrand?.logoUrl) || undefined,
-            includeLogo: Boolean(creativeBriefData?.includeLogo ?? (selectedBrand?.logo_url || selectedBrand?.logoUrl))
+            // FIXED WATERMARK: Always use StaiblTech logo (not custom logo)
+            // StaiblTech logo watermark - using full URL
+            logoUrl: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/30f8cfabb_POWEREDBYSTAIBLTECH.png', // Fixed StaiblTech logo watermark
+            includeLogo: true // Always apply StaiblTech watermark to every image
           });
 
             console.log(`Image result for part ${i + 1}:`, imageResult);
@@ -563,11 +566,18 @@ export default function CreateStoryboard() {
         // Only update database if authenticated (don't create a new storyboard)
         if (!createdStory.id.startsWith('local_')) {
           try {
-            await Story.update(createdStory.id, {
+            const updateResponse = await Story.update(createdStory.id, {
               status: "completed",
               storyboard_parts: finalStoryboard.storyboard_parts
             });
-            toast.success('Storyboard saved successfully!');
+            
+            // Check if this was a free story or paid story
+            if (updateResponse?.isFreeStory) {
+              const remaining = updateResponse.freeStoriesRemaining || 0;
+              toast.success(`Storyboard saved! Free story used. ${remaining} free stor${remaining === 1 ? 'y' : 'ies'} remaining.`);
+            } else {
+              toast.success('Storyboard saved successfully!');
+            }
             
             // Refresh credits immediately after story completion
             await refreshCredits();
@@ -802,8 +812,8 @@ export default function CreateStoryboard() {
                 </p>
               </div>
 
-              {/* Scene Count Selection - Optional */}
-              <div className="space-y-3">
+              {/* Scene Count Selection - DISABLED: Fixed to 4 images per story */}
+              {/* <div className="space-y-3">
                 <Label className="text-slate-700 font-semibold text-base md:text-lg">
                   Number of Scenes <span className="text-slate-500 font-normal">(Optional)</span>
                 </Label>
@@ -828,7 +838,6 @@ export default function CreateStoryboard() {
                   📊 Choose how many visual scenes to create from your story. More scenes = more detailed storytelling. Each scene costs 1 credit. Default is 6 scenes.
                 </p>
                 
-                {/* Current Selection Indicator */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -847,6 +856,34 @@ export default function CreateStoryboard() {
                     )}
                   </div>
                 </div>
+              </div> */}
+              
+              {/* Fixed Scene Count Display */}
+              <div className="space-y-3">
+                <Label className="text-slate-700 font-semibold text-base md:text-lg">
+                  Number of Scenes
+                </Label>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm text-blue-700 font-medium">
+                        Will create 4 scenes from your story
+                      </span>
+                    </div>
+                    {isAuthenticated && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-blue-600">Cost:</span>
+                        <span className="text-sm font-semibold text-blue-800">
+                          4 credits
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs md:text-sm text-slate-500 px-1">
+                  📊 Each storyboard includes 4 visual scenes. Each scene costs 1 credit.
+                </p>
               </div>
 
               {!isAuthenticated && (

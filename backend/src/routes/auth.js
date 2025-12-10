@@ -45,14 +45,15 @@ router.post('/register', [
       }
 
       if (data.user) {
-        // Create user profile in our custom table
+        // Create user profile in our custom table with 0 credits (2 free stories instead)
         const { error: profileError } = await supabase
           .from('user_profiles')
           .insert([{
             id: data.user.id,
             email: data.user.email,
             name: name,
-            role: 'user'
+            role: 'user',
+            credits: 0 // Explicitly set to 0 - users get 2 free stories
           }]);
 
         if (profileError) {
@@ -72,7 +73,7 @@ router.post('/register', [
               email_confirmed: data.user.email_confirmed_at ? true : false
             }
           },
-          message: 'User registered successfully. Please check your email for confirmation.'
+          message: 'User registered successfully. You can now sign in.'
         });
       }
     } catch (supabaseError) {

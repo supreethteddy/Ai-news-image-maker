@@ -630,4 +630,92 @@ router.get('/content/characters', authenticateToken, requireAdminAccess, async (
   }
 });
 
+// Public Branding Endpoint (no auth required)
+router.get('/branding-public', async (req, res) => {
+  try {
+    // Return default branding for now
+    // TODO: Implement branding storage in database
+    res.json({
+      success: true,
+      data: {
+        brandName: 'NewsPlay',
+        logoUrl: '/newsplay-logo.svg',
+        iconUrl: '/newsplay-icon.svg',
+        poweredByUrl: 'https://staibletech.com',
+        footerText: 'Powered by StaiblTech',
+        primaryFrom: '#6366f1',
+        primaryTo: '#8b5cf6'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching public branding:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch branding'
+    });
+  }
+});
+
+// Protected Branding Endpoint (admin only)
+router.get('/branding', authenticateToken, requireAdminAccess, async (req, res) => {
+  try {
+    // Return default branding for now
+    // TODO: Implement branding storage in database
+    res.json({
+      success: true,
+      data: {
+        brandName: 'NewsPlay',
+        logoUrl: '/newsplay-logo.svg',
+        iconUrl: '/newsplay-icon.svg',
+        poweredByUrl: 'https://staibletech.com',
+        footerText: 'Powered by StaiblTech',
+        primaryFrom: '#6366f1',
+        primaryTo: '#8b5cf6'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching branding:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch branding'
+    });
+  }
+});
+
+// Update Branding (admin only)
+router.put('/branding', authenticateToken, requireAdminAccess, [
+  body('brandName').optional().isString(),
+  body('logoUrl').optional().isString(),
+  body('iconUrl').optional().isString(),
+  body('poweredByUrl').optional().isString(),
+  body('footerText').optional().isString(),
+  body('primaryFrom').optional().isString(),
+  body('primaryTo').optional().isString()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    // TODO: Implement branding storage in database
+    // For now, just return success
+    res.json({
+      success: true,
+      data: req.body,
+      message: 'Branding updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating branding:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update branding'
+    });
+  }
+});
+
 export default router;

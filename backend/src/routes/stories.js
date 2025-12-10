@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken, optionalAuth } from '../middleware/auth.js';
-import { GeminiService, IdeogramService } from '../services/aiService.js';
+import { GeminiService, BananaAIService } from '../services/aiService.js';
 import storage from '../storage/inMemoryStorage.js';
 
 const router = express.Router();
@@ -75,7 +75,7 @@ router.post('/', authenticateToken, validateStoryCreation, async (req, res) => {
     const userId = req.user.userId;
 
     // Calculate credits needed based on scene count
-    const creditsNeeded = scene_count || 6; // Default to 6 if not provided
+    const creditsNeeded = scene_count || 4; // Default to 4 if not provided
     
     // Check if user has enough credits
     const userCredits = await DatabaseService.getUserCredits(userId);
@@ -91,7 +91,7 @@ router.post('/', authenticateToken, validateStoryCreation, async (req, res) => {
       visualStyle: visual_style || 'realistic',
       colorTheme: color_theme || 'modern',
       ...brand_preferences
-    }, scene_count || 6);
+    }, scene_count || 4);
 
     // Create story record
     const storyData = {
@@ -240,8 +240,8 @@ router.post('/:id/regenerate-image', authenticateToken, async (req, res) => {
       );
     }
 
-    // Generate new image using Ideogram
-    const imageResult = await IdeogramService.generateImage(enhancedPrompt, {
+    // Generate new image using Banana AI
+    const imageResult = await BananaAIService.generateImage(enhancedPrompt, {
       aspect_ratio: '16:9',
       style: story.visual_style || 'photorealistic'
     });
@@ -294,8 +294,8 @@ async function generateImagesForStory(storyId, storyboardParts, visualStyle, col
             colorTheme
           );
 
-          // Generate image using Ideogram
-          const imageResult = await IdeogramService.generateImage(enhancedPrompt, {
+          // Generate image using Banana AI
+          const imageResult = await BananaAIService.generateImage(enhancedPrompt, {
             aspect_ratio: '16:9',
             style: visualStyle || 'photorealistic'
           });

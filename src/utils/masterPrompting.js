@@ -54,6 +54,15 @@ const PROMPT_TECHNIQUES = {
     "extra limbs",
     "text overlays",
     "watermarks",
+    "text",
+    "words",
+    "letters",
+    "captions",
+    "subtitles",
+    "labels",
+    "scene markers",
+    "metadata text",
+    "timestamp",
     "duplicate subjects",
     "cropped faces"
   ],
@@ -145,9 +154,31 @@ export function buildMasterPrompt({
       // ULTRA STRONG character inclusion with maximum consistency enforcement
       prompt += `. PRIMARY SUBJECT - MAIN CHARACTER (REQUIRED IN FRAME): ${characterRef.substring(0, 100)}`;
       if (hasCharacterImage) {
-        prompt += ". ABSOLUTE REQUIREMENT: Character MUST be visible and prominently featured. Exact same facial features, identical hair style and color, same physical build, same clothing style as reference image. Zero deviation from reference appearance";
+        let characterRequirement = ". ABSOLUTE REQUIREMENT: Character MUST be visible and prominently featured. ";
+        characterRequirement += "EXACT same facial features (face structure, eyes, nose, mouth - zero deviation), ";
+        characterRequirement += "IDENTICAL hair style and color (no variation), ";
+        characterRequirement += "SAME physical build and physique (same body proportions, height, build), ";
+        characterRequirement += "SAME personality characteristics and traits (consistent behavior, expressions, mannerisms)";
+        if (maintainClothing) {
+          characterRequirement += ", same clothing style as reference image";
+        } else {
+          characterRequirement += ". Clothing may vary if day/setting/time changes, but face, physique, hair, and characteristics MUST remain identical";
+        }
+        characterRequirement += ". Zero deviation from reference appearance in physical features, face, hair, and physique";
+        prompt += characterRequirement;
       } else {
-        prompt += ". ABSOLUTE REQUIREMENT: Character MUST be clearly visible and prominently featured in this scene. Consistent facial features, hair, body type, and style across ALL scenes. Character is the focal point";
+        let characterRequirement = ". ABSOLUTE REQUIREMENT: Character MUST be clearly visible and prominently featured in this scene. ";
+        characterRequirement += "Consistent facial features (same face structure across all scenes), ";
+        characterRequirement += "same hair style and color (no variation), ";
+        characterRequirement += "same body type and physique (consistent physical build), ";
+        characterRequirement += "same personality characteristics (consistent traits, behavior, expressions)";
+        if (maintainClothing) {
+          characterRequirement += ", same clothing/outfit";
+        } else {
+          characterRequirement += ". Clothing may vary if day/setting/time changes, but face, physique, hair, and characteristics MUST remain identical";
+        }
+        characterRequirement += " across ALL scenes. Character is the focal point";
+        prompt += characterRequirement;
       }
       prompt += ". Character placement: CENTER or PROMINENT POSITION in frame. Character visibility: MANDATORY";
     } else {
@@ -185,14 +216,23 @@ export function buildMasterPrompt({
   
   // Add character consistency reinforcement for character-based storyboards
   if (characterRef && forceCharacterInclusion) {
-    let consistencyRules = "CONSISTENCY RULES: Same person in every frame, identical face, same hairstyle, same body proportions";
+    let consistencyRules = "CONSISTENCY RULES - ABSOLUTE REQUIREMENTS (NON-NEGOTIABLE): ";
+    consistencyRules += "Same person in every frame, IDENTICAL facial features (same face structure, eyes, nose, mouth, expression style), ";
+    consistencyRules += "IDENTICAL hair style and color (no variation in hair length, color, or style), ";
+    consistencyRules += "SAME body proportions and physique (same height, build, body type, physical characteristics), ";
+    consistencyRules += "SAME personality traits and characteristics (consistent behavior, mannerisms, expressions), ";
     
-    // Add clothing consistency only if scene doesn't explicitly mention changing clothes
+    // Add clothing consistency only if maintainClothing is true
     if (maintainClothing) {
-      consistencyRules += ", wearing the same outfit/clothing throughout the scene";
+      consistencyRules += "wearing the same outfit/clothing throughout the scene, ";
+    } else {
+      consistencyRules += "clothing may vary based on day/setting/time changes, but ";
     }
     
-    consistencyRules += ", recognizable as the exact same individual, no variation in core features, character identity must be unmistakable";
+    consistencyRules += "recognizable as the EXACT same individual across ALL scenes. ";
+    consistencyRules += "NO variation in core physical features, facial structure, hair, or body type. ";
+    consistencyRules += "Character identity must be unmistakable and consistent. ";
+    consistencyRules += "ONLY clothing can change (if day/setting/time changes), but face, physique, hair, and characteristics MUST remain identical.";
     prompt += `. ${consistencyRules}`;
   }
   
@@ -401,9 +441,42 @@ export function enhanceSceneForCharacter(scenePrompt, character, options = {}) {
   const isDialogScene = sceneWords.includes('speaking') || sceneWords.includes('talking') || sceneWords.includes('conversation');
   const isEmotionalScene = sceneWords.includes('sad') || sceneWords.includes('happy') || sceneWords.includes('angry');
   
-  // Check if scene explicitly mentions clothing changes
-  const clothingKeywords = ['changes clothes', 'puts on', 'wearing', 'dressed in', 'outfit', 'uniform', 'suit', 'dress', 'shirt', 'jacket', 'costume'];
-  const mentionsClothing = clothingKeywords.some(keyword => sceneWords.includes(keyword));
+  // Detect if scene prompt mentions changing clothes OR day/setting changes (for clothing consistency)
+  // Check for explicit clothing change mentions
+  const explicitClothingChange = sceneWords.includes('change clothes') || 
+                                sceneWords.includes('different outfit') || 
+                                sceneWords.includes('new clothes') ||
+                                sceneWords.includes('wearing different') ||
+                                sceneWords.includes('changed outfit') ||
+                                sceneWords.includes('switched clothes');
+  
+  // Check for day/night transitions (clothing can change when day changes)
+  const dayKeywords = ['day', 'morning', 'afternoon', 'dawn', 'sunrise', 'daylight', 'sunny day'];
+  const nightKeywords = ['night', 'evening', 'dusk', 'sunset', 'midnight', 'dark', 'nighttime', 'late night'];
+  const timeKeywords = ['next day', 'following day', 'later that day', 'the next morning', 'that evening'];
+  
+  // Extract time indicators from the prompt
+  const hasDayTime = dayKeywords.some(keyword => sceneWords.includes(keyword));
+  const hasNightTime = nightKeywords.some(keyword => sceneWords.includes(keyword));
+  const hasTimeTransition = timeKeywords.some(keyword => sceneWords.includes(keyword));
+  
+  // Check for major setting changes that might warrant clothing change
+  const settingChangeKeywords = ['different location', 'new setting', 'another place', 'different venue', 
+                                  'indoor', 'outdoor', 'inside', 'outside', 'at home', 'at office', 
+                                  'at work', 'at event', 'at party', 'formal event', 'casual setting'];
+  const hasSettingChange = settingChangeKeywords.some(keyword => sceneWords.includes(keyword));
+  
+  // Allow clothing change if:
+  // 1. Explicitly mentioned, OR
+  // 2. Day/night transition detected, OR
+  // 3. Time transition mentioned, OR
+  // 4. Major setting change with context
+  const allowClothingChange = explicitClothingChange || 
+                               hasTimeTransition || 
+                               (hasDayTime && hasNightTime) || // Both day and night mentioned
+                               (hasSettingChange && (hasDayTime || hasNightTime || hasTimeTransition));
+  
+  const maintainClothing = !allowClothingChange; // Maintain clothing unless change is justified
   
   // Detect activity-specific camera angles and positioning for natural composition
   const activityComposition = {
@@ -489,7 +562,7 @@ export function enhanceSceneForCharacter(scenePrompt, character, options = {}) {
     priority: "quality",
     hasCharacterImage: Boolean(character?.imageUrl || character?.image_url),
     forceCharacterInclusion: true,
-    maintainClothing: !mentionsClothing // Only maintain clothing if scene doesn't mention clothing changes
+    maintainClothing: maintainClothing // Maintain clothing unless day/setting changes or explicitly mentioned
   });
 }
 

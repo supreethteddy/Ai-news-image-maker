@@ -172,6 +172,92 @@ Return only the enhanced prompt, nothing else.
 // NOTE: The API endpoint and response structure below are placeholders.
 // Update with actual Banana AI API documentation when available.
 export class BananaAIService {
+  /**
+   * Generate character anchor image (reference image for consistency)
+   * This creates the initial character image that will be used as reference for all scenes
+   */
+  static async generateCharacterAnchor(characterDescription, options = {}) {
+    try {
+      console.log('🎭 Generating character anchor image...');
+      
+      // Build a focused prompt for character generation
+      const characterPrompt = `Full body portrait of: ${characterDescription}. Professional photography, clear facial features, neutral background, high detail, photorealistic, 8K resolution`;
+      
+      const negativePrompt = "blurry, low quality, distorted face, extra limbs, multiple people, text, watermarks";
+      
+      const imagenEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      
+      const response = await axios.post(imagenEndpoint, {
+        contents: [{
+          parts: [{
+            text: `Generate a photorealistic character portrait: ${characterPrompt}\n\nAvoid: ${negativePrompt}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.3,
+          topK: 20,
+          topP: 0.9,
+          maxOutputTokens: 4096
+        }
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 90000
+      });
+
+      if (!response.data?.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
+        throw new Error('No image data in character anchor response');
+      }
+
+      const imageData = response.data.candidates[0].content.parts[0].inlineData;
+      const base64Image = imageData.data;
+      
+      // Convert base64 to buffer
+      const imageBuffer = Buffer.from(base64Image, 'base64');
+      
+      // Upload to Supabase Storage if userId provided
+      if (options.userId) {
+        const storyboardId = options.storyboardId || 'temp';
+        const filename = `${options.userId}/characters/anchor-${Date.now()}.png`;
+        
+        const { data, error } = await storageService.supabase.storage
+          .from(storageService.bucketName)
+          .upload(filename, imageBuffer, {
+            contentType: 'image/png',
+            upsert: true
+          });
+
+        if (error) {
+          console.error('Error uploading character anchor:', error);
+          throw new Error('Failed to upload character anchor image');
+        }
+
+        const { data: publicUrlData } = storageService.supabase.storage
+          .from(storageService.bucketName)
+          .getPublicUrl(filename);
+
+        console.log('✅ Character anchor image created and uploaded');
+        
+        return {
+          success: true,
+          url: publicUrlData.publicUrl,
+          base64: base64Image,
+          buffer: imageBuffer
+        };
+      }
+
+      return {
+        success: true,
+        base64: base64Image,
+        buffer: imageBuffer
+      };
+    } catch (error) {
+      console.error('Error generating character anchor:', error);
+      throw error;
+    }
+  }
+
   static async generateImage(prompt, options = {}) {
     try {
       // Enhance prompt with master prompting techniques
@@ -273,19 +359,42 @@ export class BananaAIService {
       const requestedStyle = options.style_type || options.visual_style || options.style || 'GENERAL';
       let styleType = normalizeStyle(requestedStyle);
       
-      // Note: Character reference images are handled via prompt engineering
-      // The character consistency is maintained through detailed prompts
-      
-      // Use Google Gemini Pro Image Preview API
+      // Use Google Gemini Pro Image Preview API with multimodal support
       console.log('🎨 Using Google Gemini Pro Image Preview for image generation');
       
       const imagenEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
       
+      // Build parts array - multimodal if character reference exists
+      const parts = [];
+      
+      // Check if character reference image is provided (base64 format)
+      const characterRefBase64 = options.characterReferenceBase64 || options.character_reference_base64;
+      
+      if (characterRefBase64) {
+        console.log('🎭 Using character reference image for consistency (multimodal)');
+        
+        // Add text prompt with explicit instruction to use the reference
+        parts.push({
+          text: `Based EXACTLY on the character shown in the provided reference image, generate this scene: ${enhancedPrompt}\n\nMAINTAIN the character's EXACT facial features, hair style, hair color, body proportions, and physical appearance from the reference image.\n\nAvoid: ${negativePrompt}`
+        });
+        
+        // Add character reference image
+        parts.push({
+          inlineData: {
+            mimeType: 'image/png',
+            data: characterRefBase64
+          }
+        });
+      } else {
+        // Text-only generation (no character reference)
+        parts.push({
+          text: `Generate a photorealistic image: ${enhancedPrompt}\n\nNegative prompt (avoid these): ${negativePrompt}`
+        });
+      }
+      
       const response = await axios.post(imagenEndpoint, {
         contents: [{
-          parts: [{
-            text: `Generate a photorealistic image: ${enhancedPrompt}\n\nNegative prompt (avoid these): ${negativePrompt}`
-          }]
+          parts: parts
         }],
         generationConfig: {
           temperature: 0.4,

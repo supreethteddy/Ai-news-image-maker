@@ -429,7 +429,84 @@ export default function CreateStoryboard() {
       console.log("Story created, starting image generation...");
 
       // Extract character reference
-      const characterRef = extractCharacterReference(llmResponse.character_persona);
+      let characterRef = extractCharacterReference(llmResponse.character_persona);
+
+      // AUTO-GENERATE character if not described in story
+      if (!characterRef || characterRef.trim().length === 0) {
+        console.log("🎭 No character described, auto-generating based on story...");
+        // Create a generic character description based on story title/content
+        const storyContext = llmResponse.title || "protagonist";
+        characterRef = `Main character for the story "${storyContext}" - photorealistic, detailed facial features, appropriate age and appearance for the story context`;
+      }
+
+      // STEP 1: Determine character anchor image source
+      let characterAnchorBase64 = null;
+      let characterAnchorUrl = null;
+
+      // Check if user selected an uploaded character
+      const uploadedCharacterUrl = 
+        selectedCharacter?.referenceImageUrl ||
+        selectedCharacter?.reference_image_url ||
+        selectedCharacter?.imageUrl ||
+        selectedCharacter?.image_url ||
+        null;
+
+      if (uploadedCharacterUrl) {
+        // Use uploaded character image as anchor (no need to generate)
+        console.log("✅ Using uploaded character as anchor:", uploadedCharacterUrl);
+        try {
+          // Download and convert to base64
+          const imageResponse = await fetch(uploadedCharacterUrl);
+          const imageBlob = await imageResponse.blob();
+          const reader = new FileReader();
+          
+          await new Promise((resolve, reject) => {
+            reader.onloadend = () => {
+              const base64String = reader.result.split(',')[1]; // Remove data:image/png;base64, prefix
+              characterAnchorBase64 = base64String;
+              characterAnchorUrl = uploadedCharacterUrl;
+              console.log("✅ Uploaded character converted to base64 for reference");
+              resolve();
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(imageBlob);
+          });
+        } catch (conversionError) {
+          console.error("⚠️ Failed to convert uploaded character, will generate new anchor:", conversionError);
+        }
+      }
+
+      // If no uploaded character OR conversion failed, generate new anchor
+      if (!characterAnchorBase64 && characterRef && characterRef.trim().length > 0) {
+        try {
+          console.log("🎭 Generating character anchor image for consistency...");
+          
+          const anchorResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/ai/generate-character-anchor`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              characterDescription: characterRef,
+              userId: user?.id,
+              storyboardId: createdStory?.id
+            })
+          });
+
+          if (anchorResponse.ok) {
+            const anchorData = await anchorResponse.json();
+            if (anchorData.success && anchorData.base64) {
+              characterAnchorBase64 = anchorData.base64;
+              characterAnchorUrl = anchorData.url;
+              console.log("✅ Character anchor image created successfully");
+            }
+          }
+        } catch (anchorError) {
+          console.error("⚠️ Failed to create character anchor, will use text-only:", anchorError);
+          // Continue without anchor - fall back to text-only
+        }
+      }
 
       // Generate images
       const updatedParts = [...llmResponse.storyboard_parts];
@@ -478,7 +555,8 @@ export default function CreateStoryboard() {
               colorTheme: creativeBriefData?.colorTheme || 'modern',
               storyboardId: createdStory?.id || null,
               sceneIndex: i,
-              negativePrompt: negativePrompt
+              negativePrompt: negativePrompt,
+              characterReferenceBase64: characterAnchorBase64 // NEW: Pass anchor image for multimodal consistency
             },
             characterReferenceImages: characterReferenceImages,
             // FIXED WATERMARK: Always use StaiblTech logo (not custom logo)

@@ -260,4 +260,51 @@ router.post('/test-connection', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/ai/generate-character-anchor - Generate character anchor image for consistency
+router.post('/generate-character-anchor', authenticateToken, [
+  body('characterDescription').notEmpty().withMessage('Character description is required'),
+  body('userId').optional().isString(),
+  body('storyboardId').optional().isString()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { characterDescription, userId, storyboardId } = req.body;
+
+    console.log('🎭 Generating character anchor for consistency...');
+
+    const anchorResult = await BananaAIService.generateCharacterAnchor(characterDescription, {
+      userId: userId || req.user.userId,
+      storyboardId: storyboardId
+    });
+
+    if (!anchorResult.success) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate character anchor image'
+      });
+    }
+
+    res.json({
+      success: true,
+      url: anchorResult.url,
+      base64: anchorResult.base64,
+      message: 'Character anchor image generated successfully'
+    });
+  } catch (error) {
+    console.error('Character anchor generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate character anchor'
+    });
+  }
+});
+
 export default router;

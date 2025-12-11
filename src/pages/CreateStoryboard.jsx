@@ -40,7 +40,7 @@ export default function CreateStoryboard() {
   const [sceneCount, setSceneCount] = useState(4); // Fixed to 4 images per story
   const { isAuthenticated, token, user, logout, credits, refreshCredits } = useAuth();
 
-  // Character consistency helper
+  // Character consistency helper - extract single character (legacy)
   const extractCharacterReference = (characterPersona) => {
     // If a character is selected, use its information
     if (selectedCharacter) {
@@ -74,14 +74,167 @@ export default function CreateStoryboard() {
           if (reference.length + characterInfo.length < 120) {
             reference += characterInfo + ". ";
           }
+          }
         }
-      }
 
       return reference.trim().substring(0, 150);
     } catch (error) {
       console.error("Error extracting character reference:", error);
       return "";
     }
+  };
+
+  // NEW: Extract multiple characters from character_persona
+  const extractMultipleCharacters = (characterPersona) => {
+    const characters = [];
+    
+    if (!characterPersona || typeof characterPersona !== 'string') {
+      return characters;
+    }
+
+    try {
+      // Split by lines and look for character definitions
+      const lines = characterPersona.split('\n').filter(line => line && line.trim());
+      
+      // Pattern 1: "Character Name: description" or "**Character Name**: description"
+      // Pattern 2: "Character Name - description"
+      // Pattern 3: Lines starting with character names followed by colon or dash
+      
+      let currentCharacter = null;
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        // Check for character name patterns (name followed by : or -)
+        const colonMatch = trimmedLine.match(/^[*]*\s*([A-Z][a-zA-Z\s]+?)\s*[:]\s*(.+)$/);
+        const dashMatch = trimmedLine.match(/^[*]*\s*([A-Z][a-zA-Z\s]+?)\s*[-]\s*(.+)$/);
+        const boldMatch = trimmedLine.match(/\*\*([A-Z][a-zA-Z\s]+?)\*\*[:]\s*(.+)$/);
+        
+        if (colonMatch || dashMatch || boldMatch) {
+          // Save previous character if exists
+          if (currentCharacter) {
+            characters.push(currentCharacter);
+          }
+          
+          // Start new character
+          const match = colonMatch || dashMatch || boldMatch;
+          const name = (match[1] || '').trim().replace(/\*\*/g, '');
+          const description = (match[2] || '').trim();
+          
+          if (name && name.length > 0 && name.length < 50) {
+            currentCharacter = {
+              name: name,
+              description: description,
+              fullDescription: `${name}: ${description}`
+            };
+          }
+        } else if (currentCharacter && trimmedLine.length > 0) {
+          // Continue adding to current character description
+          currentCharacter.description += ' ' + trimmedLine;
+          currentCharacter.fullDescription += ' ' + trimmedLine;
+        }
+      }
+      
+      // Add last character
+      if (currentCharacter) {
+        characters.push(currentCharacter);
+      }
+      
+      // If no structured characters found, try to extract from text
+      if (characters.length === 0) {
+        // Look for common patterns like "Arun is..." or "Nina is..."
+        const namePattern = /\b([A-Z][a-z]+)\s+(?:is|was|has|had|sits|sitting|stands|standing|walks|walking)\b/gi;
+        const foundNames = new Set();
+        let match;
+        
+        while ((match = namePattern.exec(characterPersona)) !== null) {
+          const name = match[1];
+          if (name && name.length > 2 && name.length < 20 && !foundNames.has(name)) {
+            foundNames.add(name);
+            // Extract description for this character
+            const nameIndex = characterPersona.indexOf(name);
+            const nextSentence = characterPersona.substring(nameIndex, nameIndex + 200);
+            characters.push({
+              name: name,
+              description: nextSentence.substring(0, 150),
+              fullDescription: nextSentence.substring(0, 200)
+            });
+          }
+        }
+      }
+      
+      // Limit to max 5 characters to avoid too many anchors
+      return characters.slice(0, 5);
+    } catch (error) {
+      console.error("Error extracting multiple characters:", error);
+      return [];
+    }
+  };
+
+  // NEW: Detect which character(s) are mentioned in a scene (improved accuracy)
+  const detectCharactersInScene = (sceneText, characters) => {
+    if (!sceneText || !characters || characters.length === 0) {
+      return [];
+    }
+    
+    const sceneLower = sceneText.toLowerCase();
+    const mentionedCharacters = [];
+    const characterScores = new Map(); // Track how strongly each character is mentioned
+    
+    for (const char of characters) {
+      const charNameLower = char.name.toLowerCase();
+      let score = 0;
+      
+      // Pattern 1: Direct name mention (highest priority)
+      // "Arun is", "Arun sits", "Arun's", "Arun,", etc.
+      const directPattern = new RegExp(`\\b${charNameLower}\\s+(?:is|was|sits|sitting|stands|standing|walks|walking|runs|running|says|said|does|did|has|had|looks|looking|feels|feeling|thinks|thinking|goes|went|comes|came|takes|took|gives|gave|makes|made|sees|saw|knows|knew|wants|wanted|needs|needed|tries|tried|starts|started|stops|stopped|continues|continued|begins|began|ends|ended|decides|decided|chooses|chose|helps|helped|asks|asked|tells|told|shows|showed|finds|found|gets|got|puts|put|leaves|left|stays|stayed|moves|moved|turns|turned|opens|opened|closes|closed|breaks|broke|fixes|fixed|builds|built|creates|created|destroys|destroyed|saves|saved|loses|lost|wins|won|fights|fought|plays|played|works|worked|studies|studied|learns|learned|teaches|taught|writes|wrote|reads|read|sings|sang|dances|danced|paints|painted|draws|drew|cooks|cooked|eats|ate|drinks|drank|sleeps|slept|wakes|woke|wakes up|woke up|falls|fell|rises|rose|jumps|jumped|climbs|climbed|flies|flew|swims|swam|drives|drove|rides|rode|walks|walked|runs|ran|sits|sat|stands|stood|lies|lay|lays|laid|kneels|knelt|squats|squatted|bends|bent|stretches|stretched|reaches|reached|grabs|grabbed|holds|held|drops|dropped|throws|threw|catches|caught|hits|hit|kicks|kicked|pushes|pushed|pulls|pulled|lifts|lifted|carries|carried|brings|brought|takes|took|gives|gave|sends|sent|receives|received|buys|bought|sells|sold|pays|paid|costs|cost|spends|spent|earns|earned|loses|lost|wins|won|fights|fought|plays|played|works|worked|studies|studied|learns|learned|teaches|taught|writes|wrote|reads|read|sings|sang|dances|danced|paints|painted|draws|drew|cooks|cooked|eats|ate|drinks|drank|sleeps|slept|wakes|woke|wakes up|woke up|falls|fell|rises|rose|jumps|jumped|climbs|climbed|flies|flew|swims|swam|drives|drove|rides|rode|walks|walked|runs|ran|sits|sat|stands|stood|lies|lay|lays|laid|kneels|knelt|squats|squatted|bends|bent|stretches|stretched|reaches|reached|grabs|grabbed|holds|held|drops|dropped|throws|threw|catches|caught|hits|hit|kicks|kicked|pushes|pushed|pulls|pulled|lifts|lifted|carries|carried|brings|brought|takes|took|gives|gave|sends|sent|receives|received|buys|bought|sells|sold|pays|paid|costs|cost|spends|spent|earns|earned|'s|,)`, 'gi');
+      if (directPattern.test(sceneText)) {
+        score += 10; // High score for direct mention
+      }
+      
+      // Pattern 2: Name at start of sentence (very high priority)
+      const startPattern = new RegExp(`^${charNameLower}\\s+`, 'i');
+      if (startPattern.test(sceneText.trim())) {
+        score += 15; // Very high score
+      }
+      
+      // Pattern 3: Name in quotes or emphasized
+      if (sceneLower.includes(`"${charNameLower}"`) || sceneLower.includes(`'${charNameLower}'`)) {
+        score += 8;
+      }
+      
+      // Pattern 4: Name with action verbs (strong indication)
+      const actionPattern = new RegExp(`${charNameLower}\\s+(?:is|was|sits|sitting|stands|standing|walks|walking|runs|running|does|did|has|had|looks|looking|feels|feeling|thinks|thinking|goes|went|comes|came|takes|took|gives|gave|makes|made|sees|saw|knows|knew|wants|wanted|needs|needed|tries|tried|starts|started|stops|stopped|continues|continued|begins|began|ends|ended|decides|decided|chooses|chose|helps|helped|asks|asked|tells|told|shows|showed|finds|found|gets|got|puts|put|leaves|left|stays|stayed|moves|moved|turns|turned|opens|opened|closes|closed|breaks|broke|fixes|fixed|builds|built|creates|created|destroys|destroyed|saves|saved|loses|lost|wins|won|fights|fought|plays|played|works|worked|studies|studied|learns|learned|teaches|taught|writes|wrote|reads|read|sings|sang|dances|danced|paints|painted|draws|drew|cooks|cooked|eats|ate|drinks|drank|sleeps|slept|wakes|woke|wakes up|woke up|falls|fell|rises|rose|jumps|jumped|climbs|climbed|flies|flew|swims|swam|drives|drove|rides|rode|walks|walked|runs|ran|sits|sat|stands|stood|lies|lay|lays|laid|kneels|knelt|squats|squatted|bends|bent|stretches|stretched|reaches|reached|grabs|grabbed|holds|held|drops|dropped|throws|threw|catches|caught|hits|hit|kicks|kicked|pushes|pushed|pulls|pulled|lifts|lifted|carries|carried|brings|brought|takes|took|gives|gave|sends|sent|receives|received|buys|bought|sells|sold|pays|paid|costs|cost|spends|spent|earns|earned)`, 'gi');
+      if (actionPattern.test(sceneText)) {
+        score += 12; // Very high score for action verbs
+      }
+      
+      // Pattern 5: Simple name mention (lower priority)
+      if (sceneLower.includes(charNameLower)) {
+        score += 3;
+      }
+      
+      if (score > 0) {
+        characterScores.set(char, score);
+      }
+    }
+    
+    // Sort by score (highest first)
+    const sortedCharacters = Array.from(characterScores.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0]);
+    
+    // If characters detected, return only the highest scoring one (most relevant)
+    if (sortedCharacters.length > 0) {
+      return [sortedCharacters[0]]; // Return only the most relevant character
+    }
+    
+    // If no characters detected, return the first character as default
+    if (characters.length > 0) {
+      return [characters[0]];
+    }
+    
+    return [];
   };
 
   // Enhanced master prompt builder with character-focused approach
@@ -428,21 +581,24 @@ export default function CreateStoryboard() {
 
       //console.log("Story created, starting image generation...");
 
-      // Extract character reference
-      let characterRef = extractCharacterReference(llmResponse.character_persona);
-
+      // STEP 1: Extract multiple characters from story
+      const extractedCharacters = extractMultipleCharacters(llmResponse.character_persona);
+      
       // AUTO-GENERATE character if not described in story
-      if (!characterRef || characterRef.trim().length === 0) {
+      let charactersToProcess = extractedCharacters;
+      if (charactersToProcess.length === 0) {
         //console.log("🎭 No character described, auto-generating based on story...");
-        // Create a generic character description based on story title/content
         const storyContext = llmResponse.title || "protagonist";
-        characterRef = `Main character for the story "${storyContext}" - photorealistic, detailed facial features, appropriate age and appearance for the story context`;
+        charactersToProcess = [{
+          name: "Main Character",
+          description: `Main character for the story "${storyContext}" - photorealistic, detailed facial features, appropriate age and appearance for the story context`,
+          fullDescription: `Main character for the story "${storyContext}" - photorealistic, detailed facial features, appropriate age and appearance for the story context`
+        }];
       }
 
-      // STEP 1: Determine character anchor image source
-      let characterAnchorBase64 = null;
-      let characterAnchorUrl = null;
-
+      // STEP 2: Generate character anchor images for each character
+      const characterAnchors = new Map(); // Map character name -> { base64, url, description }
+      
       // Check if user selected an uploaded character
       const uploadedCharacterUrl = 
         selectedCharacter?.referenceImageUrl ||
@@ -451,62 +607,73 @@ export default function CreateStoryboard() {
         selectedCharacter?.image_url ||
         null;
 
-      if (uploadedCharacterUrl) {
-        // Use uploaded character image as anchor (no need to generate)
-        //console.log("✅ Using uploaded character as anchor:", uploadedCharacterUrl);
+      if (uploadedCharacterUrl && charactersToProcess.length > 0) {
+        // Use uploaded character image as anchor for the first character
         try {
-          // Download and convert to base64
           const imageResponse = await fetch(uploadedCharacterUrl);
           const imageBlob = await imageResponse.blob();
           const reader = new FileReader();
           
           await new Promise((resolve, reject) => {
             reader.onloadend = () => {
-              const base64String = reader.result.split(',')[1]; // Remove data:image/png;base64, prefix
-              characterAnchorBase64 = base64String;
-              characterAnchorUrl = uploadedCharacterUrl;
-              //console.log("✅ Uploaded character converted to base64 for reference");
+              const base64String = reader.result.split(',')[1];
+              const firstChar = charactersToProcess[0];
+              characterAnchors.set(firstChar.name, {
+                base64: base64String,
+                url: uploadedCharacterUrl,
+                description: firstChar.fullDescription
+              });
               resolve();
             };
             reader.onerror = reject;
             reader.readAsDataURL(imageBlob);
           });
         } catch (conversionError) {
-          console.error("⚠️ Failed to convert uploaded character, will generate new anchor:", conversionError);
+          console.error("⚠️ Failed to convert uploaded character:", conversionError);
         }
       }
 
-      // If no uploaded character OR conversion failed, generate new anchor
-      if (!characterAnchorBase64 && characterRef && characterRef.trim().length > 0) {
-        try {
-          //console.log("🎭 Generating character anchor image for consistency...");
-          
-          const anchorResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/ai/generate-character-anchor`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              characterDescription: characterRef,
-              userId: user?.id,
-              storyboardId: createdStory?.id
-            })
-          });
+      // Generate anchor images for all characters that don't have one yet
+      for (const char of charactersToProcess) {
+        if (!characterAnchors.has(char.name)) {
+          try {
+            //console.log(`🎭 Generating character anchor for ${char.name}...`);
+            
+            const anchorResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/ai/generate-character-anchor`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                characterDescription: char.fullDescription,
+                userId: user?.id,
+                storyboardId: createdStory?.id
+              })
+            });
 
-          if (anchorResponse.ok) {
-            const anchorData = await anchorResponse.json();
-            if (anchorData.success && anchorData.base64) {
-              characterAnchorBase64 = anchorData.base64;
-              characterAnchorUrl = anchorData.url;
-              //console.log("✅ Character anchor image created successfully");
+            if (anchorResponse.ok) {
+              const anchorData = await anchorResponse.json();
+              if (anchorData.success && anchorData.base64) {
+                characterAnchors.set(char.name, {
+                  base64: anchorData.base64,
+                  url: anchorData.url,
+                  description: char.fullDescription
+                });
+                //console.log(`✅ Character anchor created for ${char.name}`);
+              }
             }
+          } catch (anchorError) {
+            console.error(`⚠️ Failed to create character anchor for ${char.name}:`, anchorError);
+            // Continue without anchor for this character
           }
-        } catch (anchorError) {
-          console.error("⚠️ Failed to create character anchor, will use text-only:", anchorError);
-          // Continue without anchor - fall back to text-only
         }
       }
+
+      // Legacy single character ref for backward compatibility
+      let characterRef = charactersToProcess.length > 0 
+        ? charactersToProcess[0].fullDescription 
+        : extractCharacterReference(llmResponse.character_persona);
 
       // Generate images
       const updatedParts = [...llmResponse.storyboard_parts];
@@ -521,9 +688,28 @@ export default function CreateStoryboard() {
           try {
             //console.log(`Generating image for part ${i + 1} (attempt ${retryCount + 1})...`);
 
+            // STEP 3: Detect which character(s) are in this scene
+            const sceneText = `${updatedParts[i].image_prompt} ${updatedParts[i].text} ${updatedParts[i].section_title}`;
+            const sceneCharacters = detectCharactersInScene(sceneText, charactersToProcess);
+            
+            // Use the first detected character (or first character if none detected)
+            const sceneCharacter = sceneCharacters.length > 0 ? sceneCharacters[0] : charactersToProcess[0];
+            const sceneCharacterRef = sceneCharacter ? sceneCharacter.fullDescription : characterRef;
+            
+            // Get the correct character anchor for this scene
+            let sceneCharacterAnchorBase64 = null;
+            if (sceneCharacter && characterAnchors.has(sceneCharacter.name)) {
+              sceneCharacterAnchorBase64 = characterAnchors.get(sceneCharacter.name).base64;
+              //console.log(`✅ Using character anchor for ${sceneCharacter.name} in scene ${i + 1}`);
+            } else if (characterAnchors.size > 0) {
+              // Fallback to first available anchor
+              const firstAnchor = Array.from(characterAnchors.values())[0];
+              sceneCharacterAnchorBase64 = firstAnchor.base64;
+            }
+
             const optimizedPrompt = buildOptimizedPrompt(
               updatedParts[i].image_prompt,
-              characterRef,
+              sceneCharacterRef,
               creativeBriefData?.visualStyle || "realistic",
               creativeBriefData?.colorTheme || "modern",
               // Prefer brief logo; fallback to selected brand logo
@@ -543,7 +729,7 @@ export default function CreateStoryboard() {
             const characterReferenceImages = referenceUrl ? [referenceUrl] : [];
 
           // Generate negative prompt for better results, enhanced for character consistency
-          const negativePrompt = buildNegativePrompt("storyboard", Boolean(selectedCharacter));
+          const negativePrompt = buildNegativePrompt("storyboard", Boolean(selectedCharacter || sceneCharacterAnchorBase64));
 
           const imageResult = await runwareImageGeneration({ 
             prompt: optimizedPrompt,
@@ -556,7 +742,7 @@ export default function CreateStoryboard() {
               storyboardId: createdStory?.id || null,
               sceneIndex: i,
               negativePrompt: negativePrompt,
-              characterReferenceBase64: characterAnchorBase64 // NEW: Pass anchor image for multimodal consistency
+              characterReferenceBase64: sceneCharacterAnchorBase64 // Use correct character anchor for this scene
             },
             characterReferenceImages: characterReferenceImages,
             // FIXED WATERMARK: Always use StaiblTech logo (not custom logo)

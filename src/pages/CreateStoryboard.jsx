@@ -103,7 +103,7 @@ export default function CreateStoryboard() {
 
     // If a character is selected, use character-focused prompting
     if (selectedCharacter) {
-      console.log("Using character-focused prompting for:", selectedCharacter.name);
+      //console.log("Using character-focused prompting for:", selectedCharacter.name);
       
       // Build logo context
       const logoContext = (logoUrl && includeLogo) ? "company logo in bottom-right corner" : "";
@@ -217,7 +217,7 @@ export default function CreateStoryboard() {
   // Save storyboard to backend
   const saveStoryboardToBackend = async (storyboardData) => {
     if (!isAuthenticated || !token) {
-      console.log('Not authenticated, skipping backend save');
+      //console.log('Not authenticated, skipping backend save');
       return null;
     }
 
@@ -254,7 +254,7 @@ export default function CreateStoryboard() {
         
         return data.data;
       } else {
-        console.error('Failed to save storyboard:', await response.text());
+        //console.error('Failed to save storyboard:', await response.text());
         toast.error('Failed to save storyboard');
         return null;
       }
@@ -294,7 +294,7 @@ export default function CreateStoryboard() {
     let createdStory = null;
 
     try {
-      console.log("Starting story analysis...");
+      //console.log("Starting story analysis...");
 
       // Step 1: AI analysis with ULTRA STRONG character focus
       const characterInstruction = selectedCharacter ? 
@@ -367,7 +367,7 @@ export default function CreateStoryboard() {
         }
       });
 
-      console.log("LLM Response received:", llmResponse);
+      //console.log("LLM Response received:", llmResponse);
 
       if (!llmResponse || !llmResponse.storyboard_parts || llmResponse.storyboard_parts.length === 0) {
         throw new Error("AI could not process your story. Please try a different approach.");
@@ -375,7 +375,7 @@ export default function CreateStoryboard() {
 
       // Ensure we have exactly the requested number of parts
       if (llmResponse.storyboard_parts.length < sceneCount) {
-        console.warn(`Only got ${llmResponse.storyboard_parts.length} parts instead of ${sceneCount}. Padding with additional scenes.`);
+        //console.warn(`Only got ${llmResponse.storyboard_parts.length} parts instead of ${sceneCount}. Padding with additional scenes.`);
         // Add placeholder parts if we got fewer than requested
         while (llmResponse.storyboard_parts.length < sceneCount) {
           const partIndex = llmResponse.storyboard_parts.length + 1;
@@ -404,7 +404,7 @@ export default function CreateStoryboard() {
         status: "processing"
       };
 
-      console.log("Creating story record...");
+      //console.log("Creating story record...");
       
       try {
         createdStory = await Story.create(initialStoryboardData);
@@ -426,14 +426,14 @@ export default function CreateStoryboard() {
         setCurrentStoryboard(createdStory);
       }
 
-      console.log("Story created, starting image generation...");
+      //console.log("Story created, starting image generation...");
 
       // Extract character reference
       let characterRef = extractCharacterReference(llmResponse.character_persona);
 
       // AUTO-GENERATE character if not described in story
       if (!characterRef || characterRef.trim().length === 0) {
-        console.log("🎭 No character described, auto-generating based on story...");
+        //console.log("🎭 No character described, auto-generating based on story...");
         // Create a generic character description based on story title/content
         const storyContext = llmResponse.title || "protagonist";
         characterRef = `Main character for the story "${storyContext}" - photorealistic, detailed facial features, appropriate age and appearance for the story context`;
@@ -453,7 +453,7 @@ export default function CreateStoryboard() {
 
       if (uploadedCharacterUrl) {
         // Use uploaded character image as anchor (no need to generate)
-        console.log("✅ Using uploaded character as anchor:", uploadedCharacterUrl);
+        //console.log("✅ Using uploaded character as anchor:", uploadedCharacterUrl);
         try {
           // Download and convert to base64
           const imageResponse = await fetch(uploadedCharacterUrl);
@@ -465,7 +465,7 @@ export default function CreateStoryboard() {
               const base64String = reader.result.split(',')[1]; // Remove data:image/png;base64, prefix
               characterAnchorBase64 = base64String;
               characterAnchorUrl = uploadedCharacterUrl;
-              console.log("✅ Uploaded character converted to base64 for reference");
+              //console.log("✅ Uploaded character converted to base64 for reference");
               resolve();
             };
             reader.onerror = reject;
@@ -479,7 +479,7 @@ export default function CreateStoryboard() {
       // If no uploaded character OR conversion failed, generate new anchor
       if (!characterAnchorBase64 && characterRef && characterRef.trim().length > 0) {
         try {
-          console.log("🎭 Generating character anchor image for consistency...");
+          //console.log("🎭 Generating character anchor image for consistency...");
           
           const anchorResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/ai/generate-character-anchor`, {
             method: 'POST',
@@ -499,7 +499,7 @@ export default function CreateStoryboard() {
             if (anchorData.success && anchorData.base64) {
               characterAnchorBase64 = anchorData.base64;
               characterAnchorUrl = anchorData.url;
-              console.log("✅ Character anchor image created successfully");
+              //console.log("✅ Character anchor image created successfully");
             }
           }
         } catch (anchorError) {
@@ -519,7 +519,7 @@ export default function CreateStoryboard() {
 
         while (!imageGenerated && retryCount <= maxRetries) {
           try {
-            console.log(`Generating image for part ${i + 1} (attempt ${retryCount + 1})...`);
+            //console.log(`Generating image for part ${i + 1} (attempt ${retryCount + 1})...`);
 
             const optimizedPrompt = buildOptimizedPrompt(
               updatedParts[i].image_prompt,
@@ -531,7 +531,7 @@ export default function CreateStoryboard() {
               (creativeBriefData?.includeLogo ?? Boolean(selectedBrand?.logo_url || selectedBrand?.logoUrl))
             );
 
-            console.log(`Optimized prompt: ${optimizedPrompt}`);
+            //console.log(`Optimized prompt: ${optimizedPrompt}`);
 
             // Prepare character reference images: handle snake_case as well
             const referenceUrl = 
@@ -565,18 +565,18 @@ export default function CreateStoryboard() {
             includeLogo: true // Always apply StaiblTech watermark to every image
           });
 
-            console.log(`Image result for part ${i + 1}:`, imageResult);
+            //console.log(`Image result for part ${i + 1}:`, imageResult);
 
             if (imageResult.data && imageResult.data.url) {
               updatedParts[i].image_url = imageResult.data.url;
-              console.log(`Successfully generated image for part ${i + 1}`);
+              //console.log(`Successfully generated image for part ${i + 1}`);
               imageGenerated = true;
             } else {
-              console.error(`Failed to generate image for part ${i + 1}:`, imageResult);
+              //console.error(`Failed to generate image for part ${i + 1}:`, imageResult);
               updatedParts[i].image_url = null;
               retryCount++;
               if (retryCount <= maxRetries) {
-                console.log(`Retrying image generation for part ${i + 1}...`);
+                //console.log(`Retrying image generation for part ${i + 1}...`);
                 await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
               }
             }
@@ -613,12 +613,12 @@ export default function CreateStoryboard() {
               setErrorMessage("Image generation limit reached. Please check your account credits.");
               break; // Stop trying if we hit rate limits
             } else if (imageError.message && imageError.message.includes('timeout')) {
-              console.log(`Timeout for part ${i + 1}, will retry...`);
+              //console.log(`Timeout for part ${i + 1}, will retry...`);
               if (retryCount <= maxRetries) {
                 await new Promise(resolve => setTimeout(resolve, 2000));
               }
             } else {
-              console.error(`Failed to generate image for part ${i + 1}:`, imageError.message);
+              //console.error(`Failed to generate image for part ${i + 1}:`, imageError.message);
               if (retryCount <= maxRetries) {
                 await new Promise(resolve => setTimeout(resolve, 2000));
               }
@@ -665,7 +665,7 @@ export default function CreateStoryboard() {
         }
       }
 
-      console.log("Story generation completed successfully");
+      //console.log("Story generation completed successfully");
 
     } catch (error) {
       console.error("Error generating storyboard:", error);

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import storageService from './storageService.js';
 import LogoOverlayService from './logoOverlayService.js';
 import { buildMasterPrompt, buildNegativePrompt } from '../utils/masterPrompting.js';
+import { supabase } from '../lib/supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -218,11 +219,17 @@ export class BananaAIService {
       
       // Upload to Supabase Storage if userId provided
       if (options.userId) {
+        if (!supabase) {
+          console.error('Supabase client not initialized');
+          throw new Error('Supabase storage not available');
+        }
+
         const storyboardId = options.storyboardId || 'temp';
         const filename = `${options.userId}/characters/anchor-${Date.now()}.png`;
+        const BUCKET_NAME = 'staiblstoryboard';
         
-        const { data, error } = await storageService.supabase.storage
-          .from(storageService.bucketName)
+        const { data, error } = await supabase.storage
+          .from(BUCKET_NAME)
           .upload(filename, imageBuffer, {
             contentType: 'image/png',
             upsert: true
@@ -233,8 +240,8 @@ export class BananaAIService {
           throw new Error('Failed to upload character anchor image');
         }
 
-        const { data: publicUrlData } = storageService.supabase.storage
-          .from(storageService.bucketName)
+        const { data: publicUrlData } = supabase.storage
+          .from(BUCKET_NAME)
           .getPublicUrl(filename);
 
         console.log('✅ Character anchor image created and uploaded');

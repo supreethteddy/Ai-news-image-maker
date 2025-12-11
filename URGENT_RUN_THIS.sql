@@ -43,3 +43,4 @@ WHERE table_name = 'user_profiles'
 -- Expected result: 0 (not 10)
 
 
+

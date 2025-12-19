@@ -815,9 +815,18 @@ export default function CreateStoryboard() {
 
       // Mark as completed and save to backend
       if (createdStory?.id) {
+        // Convert character anchors Map to serializable format for storage
+        const characterAnchorsData = Array.from(characterAnchors.entries()).map(([name, data]) => ({
+          name: name,
+          base64: data.base64,
+          url: data.url,
+          description: data.description
+        }));
+
         const finalStoryboard = {
           ...createdStory,
           status: "completed",
+          character_anchors: characterAnchorsData, // Store character anchors for regeneration
           storyboard_parts: updatedParts.map(part => ({
             text: String(part.text || ""),
             image_prompt: String(part.image_prompt || ""),
@@ -832,7 +841,8 @@ export default function CreateStoryboard() {
           try {
             const updateResponse = await Story.update(createdStory.id, {
               status: "completed",
-              storyboard_parts: finalStoryboard.storyboard_parts
+              storyboard_parts: finalStoryboard.storyboard_parts,
+              character_anchors: characterAnchorsData // Save character anchors to database
             });
             
             // Check if this was a free story or paid story

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS storyboards (
     original_text TEXT NOT NULL,
     storyboard_parts JSONB NOT NULL,
     character_id UUID REFERENCES characters(id) ON DELETE SET NULL,
+    character_anchors JSONB DEFAULT '[]'::jsonb,
     style VARCHAR(100),
     status VARCHAR(50) DEFAULT 'completed',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

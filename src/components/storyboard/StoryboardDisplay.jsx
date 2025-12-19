@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, BookOpenText, RefreshCw, Sparkles, Pencil, Check, X, Image, Download, Share2, Copy, Archive } from "lucide-react";
+import { Loader2, BookOpenText, RefreshCw, Sparkles, Pencil, Check, X, Image, Download, Share2, Copy, Archive, FileDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { runwareImageGeneration } from "@/api/functions"; // Updated import
 import { InvokeLLM } from "@/api/integrations";
@@ -15,6 +15,7 @@ import { VISUAL_STYLES, COLOR_THEMES } from "../creation/StyleSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { buildMasterPrompt, buildNegativePrompt, enhanceSceneForCharacter } from "@/utils/masterPrompting";
 import { toast } from "sonner";
+import jsPDF from 'jspdf';
 
 export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardUpdate, isPublicView = false }) {
   const { isAuthenticated, token } = useAuth();
@@ -71,6 +72,201 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
     } catch (error) {
       console.error('Error downloading all images:', error);
       toast.error('Failed to download all images');
+    }
+  };
+
+  // Download storyboard as PDF (EXACT UI replica)
+  const handleDownloadPDF = async () => {
+    if (!storyboard || !storyboard.storyboard_parts || storyboard.storyboard_parts.length === 0) {
+      toast.error('No storyboard to download');
+      return;
+    }
+
+    try {
+      toast.info('Generating PDF...');
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const contentWidth = pageWidth - (2 * margin);
+      
+      let yPosition = margin + 3;
+
+      // Title - exact match to UI
+      pdf.setFontSize(26);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(15, 23, 42); // slate-900
+      const titleText = storyboard.title || 'Visual Story';
+      pdf.text(titleText, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 3;
+
+      // Purple underline separator (like UI)
+      pdf.setDrawColor(139, 92, 246); // purple-500
+      pdf.setLineWidth(1.2);
+      const lineWidth = 28;
+      pdf.line(pageWidth / 2 - lineWidth/2, yPosition, pageWidth / 2 + lineWidth/2, yPosition);
+      yPosition += 8;
+
+      // Helper to load images
+      const loadImageAsBase64 = async (url) => {
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (error) {
+          console.error('Error loading image:', error);
+          return null;
+        }
+      };
+
+      // Layout dimensions matching UI cards
+      const cardWidth = contentWidth;
+      const cardHeight = 55;
+      const halfCard = cardWidth / 2;
+      const textPadding = 8;
+      const imagePadding = 3;
+
+      // Process each storyboard part
+      for (let i = 0; i < storyboard.storyboard_parts.length; i++) {
+        const part = storyboard.storyboard_parts[i];
+        const isEven = i % 2 === 0;
+        
+        // Check if need new page
+        if (yPosition + cardHeight + 15 > pageHeight - margin) {
+          pdf.addPage();
+          yPosition = margin + 10;
+        }
+
+        const cardY = yPosition;
+
+        // Card background with shadow effect (like UI)
+        pdf.setFillColor(255, 255, 255);
+        pdf.setDrawColor(226, 232, 240); // Light border
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(margin, cardY, cardWidth, cardHeight, 2, 2, 'FD');
+
+        // Shadow effect
+        pdf.setFillColor(0, 0, 0);
+        pdf.setGState(pdf.GState({ opacity: 0.05 }));
+        pdf.roundedRect(margin + 0.5, cardY + 0.5, cardWidth, cardHeight, 2, 2, 'F');
+        pdf.setGState(pdf.GState({ opacity: 1 }));
+
+        // Calculate positions (alternating like UI)
+        const textX = isEven ? margin + textPadding : margin + halfCard + textPadding;
+        const textWidth = halfCard - (textPadding * 2);
+        const imageX = isEven ? margin + halfCard + imagePadding : margin + imagePadding;
+        const imageWidth = halfCard - (imagePadding * 2);
+        const imageHeight = cardHeight - (imagePadding * 2);
+
+        // === TEXT SECTION ===
+        let textY = cardY + 6;
+
+        // Purple numbered circle (like UI)
+        pdf.setFillColor(139, 92, 246); // purple-500
+        pdf.circle(textX + 4.5, textY + 1, 4.5, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text((i + 1).toString(), textX + 4.5, textY + 2.5, { align: 'center' });
+
+        // Section title next to circle
+        pdf.setTextColor(15, 23, 42); // slate-900
+        pdf.setFontSize(13);
+        pdf.setFont('helvetica', 'bold');
+        const sectionTitle = part.section_title || `Scene ${i + 1}`;
+        const maxTitleWidth = textWidth - 14;
+        const titleLines = pdf.splitTextToSize(sectionTitle, maxTitleWidth);
+        pdf.text(titleLines[0], textX + 11, textY + 2);
+        textY += 8;
+
+        // Story text (like UI)
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(51, 65, 85); // slate-700
+        const storyText = part.text || '';
+        const textLines = pdf.splitTextToSize(storyText, textWidth);
+        const maxLines = 6;
+        const displayLines = textLines.slice(0, maxLines);
+        pdf.text(displayLines, textX, textY, { lineHeightFactor: 1.4 });
+
+        // === IMAGE SECTION ===
+        if (part.image_url) {
+          try {
+            const imgData = await loadImageAsBase64(part.image_url);
+            if (imgData) {
+              // Add image (jsPDF doesn't support rounded corners directly, but border helps)
+              pdf.addImage(imgData, 'JPEG', imageX, cardY + imagePadding, imageWidth, imageHeight, undefined, 'FAST');
+              
+              // Optional: Add subtle border around image
+              pdf.setDrawColor(226, 232, 240);
+              pdf.setLineWidth(0.2);
+              pdf.rect(imageX, cardY + imagePadding, imageWidth, imageHeight);
+            }
+          } catch (error) {
+            console.error(`Error adding image ${i + 1}:`, error);
+            // Placeholder
+            pdf.setFillColor(241, 245, 249);
+            pdf.rect(imageX, cardY + imagePadding, imageWidth, imageHeight, 'F');
+            pdf.setFontSize(8);
+            pdf.setTextColor(148, 163, 184);
+            pdf.text('[Image not available]', imageX + imageWidth/2, cardY + cardHeight/2, { align: 'center' });
+          }
+        }
+
+        yPosition = cardY + cardHeight + 4;
+
+        // Separator between cards (like UI - horizontal lines with dot)
+        if (i < storyboard.storyboard_parts.length - 1) {
+          const separatorY = yPosition;
+          
+          // Left line
+          pdf.setDrawColor(203, 213, 225); // slate-300
+          pdf.setLineWidth(0.3);
+          pdf.line(pageWidth / 2 - 25, separatorY, pageWidth / 2 - 4, separatorY);
+          
+          // Center dot
+          pdf.setFillColor(139, 92, 246); // purple-500
+          pdf.circle(pageWidth / 2, separatorY, 1.5, 'F');
+          
+          // Right line
+          pdf.line(pageWidth / 2 + 4, separatorY, pageWidth / 2 + 25, separatorY);
+          
+          yPosition += 4;
+        }
+      }
+
+      // End of Story section (exactly like UI)
+      yPosition += 5;
+      
+      // Top separator line (purple)
+      pdf.setDrawColor(139, 92, 246);
+      pdf.setLineWidth(0.8);
+      pdf.line(pageWidth / 2 - 15, yPosition, pageWidth / 2 + 15, yPosition);
+      yPosition += 6;
+      
+      // "End of Story" text
+      pdf.setFontSize(13);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 116, 139); // slate-500
+      pdf.text('End of Story', pageWidth / 2, yPosition, { align: 'center' });
+
+      // Save PDF
+      pdf.save(`${storyboard.title || 'storyboard'}.pdf`);
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF');
     }
   };
 
@@ -251,8 +447,16 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
 
       console.log(`Regenerating image with prompt: ${optimizedPrompt}`); // Debug logging
 
+      // Retrieve stored character anchor if available
+      let characterAnchorBase64 = null;
+      if (storyboard.character_anchors && Array.isArray(storyboard.character_anchors) && storyboard.character_anchors.length > 0) {
+        // Use the first character anchor (primary character)
+        characterAnchorBase64 = storyboard.character_anchors[0].base64;
+        console.log(`✅ Using stored character anchor for regeneration`);
+      }
+
       // Generate negative prompt for better results, enhanced for character consistency
-      const hasCharacterInStoryboard = Boolean(characterRef || storyboard?.character_persona);
+      const hasCharacterInStoryboard = Boolean(characterRef || storyboard?.character_persona || characterAnchorBase64);
       const negativePrompt = buildNegativePrompt("storyboard", hasCharacterInStoryboard);
 
       // Changed from GenerateImage to runwareImageGeneration with master prompting
@@ -260,7 +464,8 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
         prompt: optimizedPrompt,
         negativePrompt: negativePrompt,
         options: {
-          negativePrompt: negativePrompt
+          negativePrompt: negativePrompt,
+          characterReferenceBase64: characterAnchorBase64 // Use stored character anchor
         }
       });
 
@@ -514,6 +719,16 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
                 Download All Images (ZIP)
               </Button>
 
+              {/* Download PDF Button - Prominent */}
+              <Button 
+                onClick={handleDownloadPDF}
+                size="lg"
+                className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+              >
+                <FileDown className="w-5 h-5 mr-2" />
+                Download as PDF
+              </Button>
+
               {/* Share Button - Prominent */}
               <Popover open={showSharePopover} onOpenChange={setShowSharePopover}>
                 <PopoverTrigger asChild>
@@ -550,6 +765,20 @@ export default function StoryboardDisplay({ storyboard, isLoading, onStoryboardU
                   </div>
                 </PopoverContent>
               </Popover>
+            </div>
+          )}
+
+          {/* PDF Download for public view and local storyboards */}
+          {(isPublicView || (storyboard.id && storyboard.id.startsWith('local_'))) && (
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button 
+                onClick={handleDownloadPDF}
+                size="lg"
+                className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+              >
+                <FileDown className="w-5 h-5 mr-2" />
+                Download as PDF
+              </Button>
             </div>
           )}
         </div>

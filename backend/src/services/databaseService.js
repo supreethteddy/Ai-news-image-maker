@@ -64,6 +64,7 @@ export class DatabaseService {
           image_url: part.image_url || part.imageUrl  // Handle both cases
         })),
         character_id: storyboard.character_id,
+        character_anchors: storyboard.character_anchors || [], // Include character anchors
         style: storyboard.style,
         user_id: storyboard.user_id,
         created_at: storyboard.created_at,
@@ -100,6 +101,7 @@ export class DatabaseService {
           image_url: part.image_url || part.imageUrl  // Handle both cases
         })),
         character_id: data.character_id,
+        character_anchors: data.character_anchors || [], // Include character anchors
         style: data.style,
         user_id: data.user_id,
         created_at: data.created_at,
@@ -136,6 +138,7 @@ export class DatabaseService {
           image_url: part.image_url || part.imageUrl
         })),
         character_id: data.character_id,
+        character_anchors: data.character_anchors || [], // Include character anchors
         style: data.style,
         user_id: data.user_id,
         created_at: data.created_at,
@@ -347,10 +350,10 @@ export class DatabaseService {
   // User Profiles
   static async createUserProfile(data) {
     try {
-      // New users start with 0 credits - they get 2 FREE stories instead
+      // Ensure new users get 10 credits by default
       const profileData = {
         ...data,
-        credits: 0 // Always 0 credits for new users
+        credits: data.credits || 10
       };
 
       const { data: result, error } = await supabase
@@ -361,8 +364,17 @@ export class DatabaseService {
 
       if (error) throw error;
 
-      // No initial credit transaction - users get 2 free stories instead
-      
+      // Log the initial credit transaction
+      if (result && result.credits > 0) {
+        await this.createCreditTransaction({
+          user_id: result.id,
+          transaction_type: 'credit',
+          amount: result.credits,
+          description: 'Initial signup bonus',
+          reference_type: 'signup'
+        });
+      }
+
       return result;
     } catch (error) {
       console.error('Error creating user profile:', error);

@@ -63,7 +63,8 @@ const CreditRechargeModal = ({ isOpen, onClose, onSuccess }) => {
         },
         body: JSON.stringify({
           packageId,
-          paymentMethod: 'demo' // For demo purposes
+          // Keep instant server-side crediting active until gateway integration is enabled.
+          paymentMethod: 'demo'
         })
       });
 
@@ -244,7 +245,7 @@ const CreditRechargeModal = ({ isOpen, onClose, onSuccess }) => {
                         ) : (
                           <>
                             <CreditCard className="h-4 w-4 mr-2" />
-                            Purchase Now
+                            Recharge Now
                           </>
                         )}
                       </Button>
@@ -280,17 +281,16 @@ const CreditRechargeModal = ({ isOpen, onClose, onSuccess }) => {
               </div>
             </div>
 
-            {/* Demo notice */}
+            {/* Temporary instant top-up note until payment gateway integration */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="bg-blue-100 rounded-full p-2">
                   <CreditCard className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-blue-900 mb-1">Demo Mode</h4>
+                  <h4 className="font-semibold text-blue-900 mb-1">Instant Credit Activation</h4>
                   <p className="text-sm text-blue-700">
-                    This is a demo version. In production, this would integrate with Stripe, PayPal, or other payment processors. 
-                    For now, clicking "Purchase Now" will instantly add credits to your account.
+                    Credits are added to your account immediately after clicking "Recharge Now".
                   </p>
                 </div>
               </div>

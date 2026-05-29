@@ -187,8 +187,7 @@ router.get('/packages', async (req, res) => {
 
 // Purchase credits (DEMO: instant purchase - replace with Stripe/PayPal in production)
 router.post('/purchase', authenticateToken, [
-  body('packageId').isUUID().withMessage('Valid package ID is required'),
-  body('paymentMethod').optional().isString().withMessage('Payment method must be a string')
+  body('packageId').isUUID().withMessage('Valid package ID is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -200,7 +199,8 @@ router.post('/purchase', authenticateToken, [
       });
     }
 
-    const { packageId, paymentMethod = 'demo' } = req.body;
+    const { packageId } = req.body;
+    const paymentMethod = 'demo';
     
     // Generate a demo payment ID (replace with real payment processor ID in production)
     const demoPaymentId = `demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
